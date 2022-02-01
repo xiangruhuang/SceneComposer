@@ -16,6 +16,7 @@ dataset_name_map = {
 def create_groundtruth_database(
     dataset_class_name,
     data_path,
+    split,
     info_path=None,
     used_classes=None,
     db_path=None,
@@ -53,14 +54,14 @@ def create_groundtruth_database(
     if dataset_class_name in ["WAYMO", "NUSC"]: 
         if db_path is None:
             if virtual:
-                db_path = root_path / f"gt_database_{nsweeps}sweeps_withvelo_virtual"
+                db_path = root_path / f"gt_database_{split}_{nsweeps}sweeps_withvelo_virtual"
             else:
-                db_path = root_path / f"gt_database_{nsweeps}sweeps_withvelo"
+                db_path = root_path / f"gt_database_{split}_{nsweeps}sweeps_withvelo"
         if dbinfo_path is None:
             if virtual:
-                dbinfo_path = root_path / f"dbinfos_train_{nsweeps}sweeps_withvelo_virtual.pkl"
+                dbinfo_path = root_path / f"dbinfos_{split}_{nsweeps}sweeps_withvelo_virtual.pkl"
             else:
-                dbinfo_path = root_path / f"dbinfos_train_{nsweeps}sweeps_withvelo.pkl"
+                dbinfo_path = root_path / f"dbinfos_{split}_{nsweeps}sweeps_withvelo.pkl"
     else:
         raise NotImplementedError()
 
