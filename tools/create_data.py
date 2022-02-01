@@ -25,6 +25,7 @@ def waymo_data_prep(root_path, split, nsweeps=1):
         create_groundtruth_database(
             "WAYMO",
             root_path,
+            split,
             Path(root_path) / f"infos_{split}_{nsweeps:02d}sweeps_filter_zero_gt.pkl",
             used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
             nsweeps=nsweeps
