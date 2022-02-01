@@ -21,11 +21,11 @@ def nuscenes_data_prep(root_path, version, nsweeps=10, filter_zero=True, virtual
 
 def waymo_data_prep(root_path, split, nsweeps=1):
     waymo_ds.create_waymo_infos(root_path, split=split, nsweeps=nsweeps)
-    if split == 'train': 
+    if split.startswith('train'): 
         create_groundtruth_database(
             "WAYMO",
             root_path,
-            Path(root_path) / "infos_train_{:02d}sweeps_filter_zero_gt.pkl".format(nsweeps),
+            Path(root_path) / f"infos_{split}_{nsweeps:02d}sweeps_filter_zero_gt.pkl",
             used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
             nsweeps=nsweeps
         )
