@@ -27,6 +27,7 @@ def convert(idx):
     fname = fnames[idx]
     dataset = tf.data.TFRecordDataset(fname, compression_type='')
     for frame_id, data in enumerate(dataset):
+        save_path = os.path.join(LIDAR_PATH, 'seq_{}_frame_{}.pkl'.format(idx, frame_id))
         frame = dataset_pb2.Frame()
         frame.ParseFromString(bytearray(data.numpy()))
         decoded_frame = waymo_decoder.decode_frame(frame, frame_id)
