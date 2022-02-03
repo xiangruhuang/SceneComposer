@@ -79,35 +79,12 @@ dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
 
-db_sampler = dict(
-    type="GT-AUG",
-    enable=False,
-    db_info_path="data/Waymo/dbinfos_train_50_1sweeps_withvelo.pkl",
-    sample_groups=[
-        dict(VEHICLE=0),
-        dict(PEDESTRIAN=0),
-        dict(CYCLIST=0),
-    ],
-    db_prep_steps=[
-        dict(
-            filter_by_min_num_points=dict(
-                VEHICLE=5,
-                PEDESTRIAN=5,
-                CYCLIST=5,
-            )
-        ),
-        dict(filter_by_difficulty=[-1],),
-    ],
-    global_random_rotation_range_per_object=[0, 0],
-    rate=1.0,
-) 
-
 train_preprocessor = dict(
     mode="train",
     shuffle_points=True,
     global_rot_noise=[-0.78539816, 0.78539816],
     global_scale_noise=[0.95, 1.05],
-    db_sampler=db_sampler,
+    db_sampler=None,
     class_names=class_names,
 )
 
