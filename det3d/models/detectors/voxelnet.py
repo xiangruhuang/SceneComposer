@@ -4,7 +4,7 @@ from det3d.torchie.trainer import load_checkpoint
 import torch 
 from copy import deepcopy 
 from det3d.core import Visualizer
-vis = Visualizer()
+#vis = Visualizer()
 from det3d.core.bbox import box_np_ops
 
 @DETECTORS.register_module
