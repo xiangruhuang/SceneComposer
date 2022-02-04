@@ -92,9 +92,11 @@ class Visualizer:
         edges = np.repeat(edges[np.newaxis, ...], N, axis=0) # [N, 12, 2]
         offset = np.arange(N)[..., np.newaxis, np.newaxis]*8 # [N, 1, 1]
         edges = edges + offset
+        if kwargs.get('radius', None) is None:
+            kwargs['radius'] = 2e-4
         ps_box = ps.register_curve_network(
                      name, corners.reshape(-1, 3),
-                     edges.reshape(-1, 2), radius=2e-4, **kwargs
+                     edges.reshape(-1, 2), **kwargs
                  )
         if labels is not None:
             # R->Car, G->Ped, B->Cyc

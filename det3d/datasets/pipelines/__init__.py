@@ -25,4 +25,5 @@ __all__ = [
     "AssignLabel",
     "AffineAug",
     "GTAug",
+    "ReplaceAug",
 ]

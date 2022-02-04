@@ -1,6 +1,10 @@
 import numpy as np
+import pickle
 
 from det3d.core.bbox import box_np_ops
+from det3d.core.bbox.geometry import (
+    points_in_convex_polygon_3d_jit
+)
 from det3d.core.sampler import preprocess as prep
 from det3d.builder import build_dbsampler
 
@@ -16,6 +20,94 @@ def _dict_select(dict_, inds):
             _dict_select(v, inds)
         else:
             dict_[k] = v[inds]
+
+
+@PIPELINES.register_module
+class ReplaceAug(object):
+    def __init__(self, cfg=None, **kwargs):
+        self.mode = cfg.mode
+        if self.mode == "train":
+            self.class_names = cfg.class_names
+        dbinfo_path = cfg.get('dbinfo_path', None)
+        if dbinfo_path is not None:
+            with open(dbinfo_path, 'rb') as fin:
+                self._dbinfos = pickle.load(fin)
+
+        self.replace_prob = cfg.get('replace_prob', 0.5)
+
+    def __call__(self, res, info):
+        
+        points = res["lidar"]["points"]
+        gt_dict = res["lidar"]["annotations"]
+
+        gt_boxes = gt_dict['gt_boxes']
+        gt_names = gt_dict['gt_names']
+        num_boxes = gt_boxes.shape[0]
+        removed_box_indices = []
+        new_box_infos = []
+        
+        for class_name in self.class_names:
+            indices = np.array([i for i, gt_name in enumerate(gt_names)
+                                if gt_name == class_name])
+            num_boxes = indices.shape[0]
+            if num_boxes == 0:
+                continue
+            boxes = gt_boxes[indices]
+            names = gt_names[indices]
+            
+            mask = np.random.uniform(size=(num_boxes)) < self.replace_prob
+            if mask.astype(np.int32).sum() == 0:
+                continue
+
+            replaced_boxes = boxes[mask]
+            num_replaces = replaced_boxes.shape[0]
+            
+            class_infos = self._dbinfos[class_name]
+            rand_indices = np.random.permutation(len(class_infos))[:num_replaces]
+            new_box_infos += [class_infos[i] for i in rand_indices]
+            removed_box_indices.append(indices[mask])
+        
+        if len(removed_box_indices) > 0:
+            removed_box_indices = np.concatenate(removed_box_indices, axis=0)
+
+            new_boxes = np.stack(
+                            [info['box3d_lidar'] for info in new_box_infos]
+                        )
+            new_boxes[:, :3] = gt_boxes[removed_box_indices, :3]
+
+            new_points = []
+            for i, info in enumerate(new_box_infos):
+                path = 'data/Waymo/'+info['path']
+                cluster = np.fromfile(path, dtype=np.float32).reshape(-1, 5)
+                cluster[:, :3] += new_boxes[i, :3]
+                new_points.append(cluster)
+
+            new_points = np.concatenate(new_points, axis=0)
+            involved_boxes = np.concatenate(
+                                 [new_boxes, gt_boxes[removed_box_indices]],
+                                 axis=0,
+                             )
+            
+            corners = box_np_ops.center_to_corner_box3d(
+                involved_boxes[:, :3],
+                involved_boxes[:, 3:6],
+                involved_boxes[:, -1],
+                axis=2,
+            )
+            surfaces = box_np_ops.corner_to_surfaces_3d(corners)
+            indices = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
+            valid_mask = indices.any(-1) == False
+            points = points[valid_mask]
+
+            points = np.concatenate([points, new_points], axis=0)
+            gt_boxes[removed_box_indices] = new_boxes
+            gt_dict["gt_boxes"] = gt_boxes
+
+        res["lidar"]["points"] = points
+        res["lidar"]["annotations"] = gt_dict
+
+        return res, info
+
 
 @PIPELINES.register_module
 class GTAug(object):
