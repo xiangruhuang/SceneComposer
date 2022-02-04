@@ -127,6 +127,8 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
+    dict(type="GTAug", cfg=train_preprocessor),
+    dict(type="AffineAug", cfg=train_preprocessor),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
@@ -155,7 +157,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
-        load_interval=30,
+        load_interval=100,
     ),
     val=dict(
         type=dataset_type,

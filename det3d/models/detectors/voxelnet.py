@@ -4,7 +4,6 @@ from det3d.torchie.trainer import load_checkpoint
 import torch 
 from copy import deepcopy 
 from det3d.core import Visualizer
-#vis = Visualizer()
 from det3d.core.bbox import box_np_ops
 
 @DETECTORS.register_module
@@ -58,33 +57,35 @@ class VoxelNet(SingleStageDetector):
     def forward(self, example, return_loss=True, **kwargs):
         x, _ = self.extract_feat(example)
 
-        #for i, points in enumerate(example['points']):
-        #    points = points.detach().cpu()
-        #    vis.clear()
-        #    vis.pointcloud('points', points[:, :3])
-        #    mask = example['mask'][0][i]
-        #    gt_boxes_and_cls = example['gt_boxes_and_cls'][i, mask.bool()]
-        #    gt_boxes = gt_boxes_and_cls[:, :-3].detach().cpu().numpy()
-        #    cls = gt_boxes_and_cls[:, -1].detach().cpu().long()
-        #    gt_corners = box_np_ops.center_to_corner_box3d(
-        #                     gt_boxes[:, :3],
-        #                     gt_boxes[:, 3:6],
-        #                     gt_boxes[:, -1],
-        #                     axis=2)
-        #    vis.boxes('boxes', gt_corners, cls)
-        #    dims = (points.max(0)[0][:2] - points.min(0)[0][:2])/4.0
-        #    center = (points.max(0)[0][:3] + points.min(0)[0][:3]).detach().cpu()/2.0
-        #    token = example['metadata'][i]['token'].split('.')[0]
-        #    seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
-        #    #for dx in [0, 1]:
-        #    #    for dy in [0, 1]:
-        #    #        suffix = f'{dx}{dy}'
-        #    #        center_ = center.clone()
-        #    #        center_[:2] -= dims
-        #    #        center_[0] += dims[0]*2*dx
-        #    #        center_[1] += dims[1]*2*dy
-        #    vis.look_at(center)
-        #    vis.screenshot(f'figures/seq_{seq_id:03d}_frame_{frame_id:03d}.png')
+        if True:
+            vis = Visualizer()
+            for i, points in enumerate(example['points']):
+                points = points.detach().cpu()
+                vis.clear()
+                vis.pointcloud('points', points[:, :3])
+                mask = example['mask'][0][i]
+                gt_boxes_and_cls = example['gt_boxes_and_cls'][i, mask.bool()]
+                gt_boxes = gt_boxes_and_cls[:, :-3].detach().cpu().numpy()
+                cls = gt_boxes_and_cls[:, -1].detach().cpu().long()
+                gt_corners = box_np_ops.center_to_corner_box3d(
+                                 gt_boxes[:, :3],
+                                 gt_boxes[:, 3:6],
+                                 gt_boxes[:, -1],
+                                 axis=2)
+                vis.boxes('boxes', gt_corners, cls)
+                dims = (points.max(0)[0][:2] - points.min(0)[0][:2])/4.0
+                center = (points.max(0)[0][:3] + points.min(0)[0][:3]).detach().cpu()/2.0
+                token = example['metadata'][i]['token'].split('.')[0]
+                seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
+                #for dx in [0, 1]:
+                #    for dy in [0, 1]:
+                #        suffix = f'{dx}{dy}'
+                #        center_ = center.clone()
+                #        center_[:2] -= dims
+                #        center_[0] += dims[0]*2*dx
+                #        center_[1] += dims[1]*2*dy
+                vis.look_at(center)
+                vis.screenshot(f'figures/seq_{seq_id:03d}_frame_{frame_id:03d}.png')
 
         preds, _ = self.bbox_head(x)
 
