@@ -202,6 +202,7 @@ class LoadPointCloudAnnotations(object):
             res["lidar"]["annotations"] = {
                 "boxes": info["gt_boxes"].astype(np.float32),
                 "names": info["gt_names"],
+                "unique_ids": info["unique_ids"],
             }
         else:
             pass 

@@ -261,6 +261,7 @@ def _fill_infos(root_path, frames, split='train', nsweeps=1):
             annos = ref_obj['objects']
             num_points_in_gt = np.array([ann['num_points'] for ann in annos])
             gt_boxes = np.array([ann['box'] for ann in annos]).reshape(-1, 9)
+            unique_ids = np.array([ann['name'] for ann in annos]).reshape(-1)
             
             if len(gt_boxes) != 0:
                 # transform from Waymo to KITTI coordinate 
@@ -275,6 +276,7 @@ def _fill_infos(root_path, frames, split='train', nsweeps=1):
             # filter boxes without lidar points 
             info['gt_boxes'] = gt_boxes[mask_not_zero, :].astype(np.float32)
             info['gt_names'] = gt_names[mask_not_zero].astype(str)
+            info['unique_ids'] = unique_ids[mask_not_zero].astype(str)
 
         infos.append(info)
     return infos

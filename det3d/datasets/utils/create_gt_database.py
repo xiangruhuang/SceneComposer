@@ -69,6 +69,8 @@ def create_groundtruth_database(
 
     all_db_infos = {}
     group_counter = 0
+    unique_id_dict = {}
+    unique_id_count = 0
 
     for index in tqdm(range(len(dataset))):
         image_idx = index
@@ -85,23 +87,26 @@ def create_groundtruth_database(
         annos = sensor_data["lidar"]["annotations"]
         gt_boxes = annos["boxes"]
         names = annos["names"]
+        unique_ids = annos["unique_ids"]
 
-        if dataset_class_name == 'WAYMO':
-            # waymo dataset contains millions of objects and it is not possible to store
-            # all of them into a single folder
-            # we randomly sample a few objects for gt augmentation
-            # We keep all cyclist as they are rare 
-            if index % 4 != 0:
-                mask = (names == 'VEHICLE') 
-                mask = np.logical_not(mask)
-                names = names[mask]
-                gt_boxes = gt_boxes[mask]
+        #if dataset_class_name == 'WAYMO':
+        #    # waymo dataset contains millions of objects and it is not possible to store
+        #    # all of them into a single folder
+        #    # we randomly sample a few objects for gt augmentation
+        #    # We keep all cyclist as they are rare 
+        #    if index % 4 != 0:
+        #        mask = (names == 'VEHICLE') 
+        #        mask = np.logical_not(mask)
+        #        names = names[mask]
+        #        gt_boxes = gt_boxes[mask]
+        #        unique_ids = unique_ids[mask]
 
-            if index % 2 != 0:
-                mask = (names == 'PEDESTRIAN')
-                mask = np.logical_not(mask)
-                names = names[mask]
-                gt_boxes = gt_boxes[mask]
+        #    if index % 2 != 0:
+        #        mask = (names == 'PEDESTRIAN')
+        #        mask = np.logical_not(mask)
+        #        names = names[mask]
+        #        gt_boxes = gt_boxes[mask]
+        #        unique_ids = unique_ids[mask]
 
         group_dict = {}
         group_ids = np.full([gt_boxes.shape[0]], -1, dtype=np.int64)
@@ -118,8 +123,15 @@ def create_groundtruth_database(
             continue 
         point_indices = box_np_ops.points_in_rbbox(points, gt_boxes)
         for i in range(num_obj):
+            unique_id = unique_ids[i]
             if (used_classes is None) or names[i] in used_classes:
-                filename = f"{image_idx}_{names[i]}_{i}.bin"
+                if unique_id_dict.get(unique_id, None) is None:
+                    unique_id_dict[unique_id] = unique_id_count
+                    unique_idx = unique_id_count
+                    unique_id_count += 1
+                else:
+                    unique_idx = unique_id_dict[unique_id]
+                filename = f"{image_idx}_{names[i]}_{i}_u{unique_idx}.bin"
                 dirpath = os.path.join(str(db_path), names[i])
                 os.makedirs(dirpath, exist_ok=True)
 
@@ -145,6 +157,7 @@ def create_groundtruth_database(
                     "image_idx": image_idx,
                     "gt_idx": i,
                     "box3d_lidar": gt_boxes[i],
+                    "unique_id": unique_ids[i],
                     "num_points_in_gt": gt_points.shape[0],
                     "difficulty": difficulty[i],
                     # "group_id": -1,
