@@ -2,6 +2,7 @@ import itertools
 import logging
 
 from det3d.utils.config_tool import get_downsample_factor
+from configs import augmentations
 
 tasks = [
     dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
@@ -79,35 +80,9 @@ dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
 
-db_sampler = dict(
-    type="GT-AUG",
-    enable=False,
-    db_info_path="data/Waymo/dbinfos_train_50_1sweeps_withvelo.pkl",
-    sample_groups=[
-        dict(VEHICLE=15),
-        dict(PEDESTRIAN=10),
-        dict(CYCLIST=10),
-    ],
-    db_prep_steps=[
-        dict(
-            filter_by_min_num_points=dict(
-                VEHICLE=5,
-                PEDESTRIAN=5,
-                CYCLIST=5,
-            )
-        ),
-        dict(filter_by_difficulty=[-1],),
-    ],
-    global_random_rotation_range_per_object=[0, 0],
-    rate=1.0,
-) 
-
 train_preprocessor = dict(
     mode="train",
     shuffle_points=True,
-    global_rot_noise=[-0.78539816, 0.78539816],
-    global_scale_noise=[0.95, 1.05],
-    db_sampler=db_sampler,
     class_names=class_names,
 )
 
@@ -127,8 +102,8 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    dict(type="GTAug", cfg=train_preprocessor),
-    dict(type="AffineAug", cfg=train_preprocessor),
+    augmentations.gt_aug_15_10_10(split="train_50"),
+    augmentations.affine_aug(),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),

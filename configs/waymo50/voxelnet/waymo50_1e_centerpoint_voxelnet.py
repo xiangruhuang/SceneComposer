@@ -2,6 +2,7 @@ import itertools
 import logging
 
 from det3d.utils.config_tool import get_downsample_factor
+from configs import augmentations
 
 tasks = [
     dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
@@ -67,7 +68,7 @@ test_cfg = dict(
         nms_post_max_size=500,
         nms_iou_threshold=0.7,
     ),
-    score_threshold=0.3,
+    score_threshold=0.1,
     pc_range=[-75.2, -75.2],
     out_size_factor=get_downsample_factor(model),
     voxel_size=[0.1, 0.1],
@@ -82,11 +83,7 @@ data_root = "data/Waymo"
 train_preprocessor = dict(
     mode="train",
     shuffle_points=True,
-    global_rot_noise=[-0.78539816, 0.78539816],
-    global_scale_noise=[0.95, 1.05],
     class_names=class_names,
-    replace_prob=0.5,
-    dbinfo_path="data/Waymo/dbinfos_train_50_1sweeps_withvelo.pkl",
 )
 
 val_preprocessor = dict(
@@ -98,15 +95,15 @@ voxel_generator = dict(
     range=[-75.2, -75.2, -2, 75.2, 75.2, 4],
     voxel_size=[0.1, 0.1, 0.15],
     max_points_in_voxel=5,
-    max_voxel_num=[150000, 200000],
+    max_voxel_num=150000,
 )
 
 train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    dict(type="ReplaceAug", cfg=train_preprocessor),
-    dict(type="AffineAug", cfg=train_preprocessor),
+    augmentations.gt_aug_15_10_10("train_50"),
+    augmentations.affine_aug(),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
@@ -125,8 +122,8 @@ val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=5,
-    workers_per_gpu=5,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -135,6 +132,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
+        load_interval=100,
     ),
     val=dict(
         type=dataset_type,
@@ -180,7 +178,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 72
+total_epochs = 1
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

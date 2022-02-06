@@ -24,6 +24,13 @@ def _dict_select(dict_, inds):
 
 @PIPELINES.register_module
 class ReplaceAug(object):
+    """Replace Augmentation.
+
+    For each ground truth box (object), with probability `replace_prob`,
+    replace the box with a random one of the same class.
+    Properly orient the box.
+
+    """
     def __init__(self, cfg=None, **kwargs):
         self.mode = cfg.mode
         if self.mode == "train":
@@ -34,6 +41,7 @@ class ReplaceAug(object):
                 self._dbinfos = pickle.load(fin)
 
         self.replace_prob = cfg.get('replace_prob', 0.5)
+        self.keep_orientation = cfg.get('keep_orientation', True)
 
     def __call__(self, res, info):
         
@@ -46,6 +54,7 @@ class ReplaceAug(object):
         removed_box_indices = []
         new_box_infos = []
         
+        # decide the boxes to be removed and the new box attributes
         for class_name in self.class_names:
             indices = np.array([i for i, gt_name in enumerate(gt_names)
                                 if gt_name == class_name])
@@ -69,23 +78,38 @@ class ReplaceAug(object):
         
         if len(removed_box_indices) > 0:
             removed_box_indices = np.concatenate(removed_box_indices, axis=0)
+            removed_boxes = gt_boxes[removed_box_indices]
 
             new_boxes = np.stack(
                             [info['box3d_lidar'] for info in new_box_infos]
                         )
-            new_boxes[:, :3] = gt_boxes[removed_box_indices, :3]
+            new_boxes[:, :3] = removed_boxes[:, :3]
 
             new_points = []
             for i, info in enumerate(new_box_infos):
                 path = 'data/Waymo/'+info['path']
                 cluster = np.fromfile(path, dtype=np.float32).reshape(-1, 5)
+                box_i = removed_boxes[i:i+1]
+                new_box_i = new_boxes[i:i+1]
+
+                if self.keep_orientation:
+                    # rotate the points to follow
+                    # the orientation of the old object
+                    theta = new_box_i[0, -1] - box_i[0, -1]
+                    R = np.array([np.cos(theta), -np.sin(theta),
+                                  np.sin(theta),  np.cos(theta)]).reshape(2, 2)
+                    cluster[:, :2] = cluster[:, :2] @ R.T
                 cluster[:, :3] += new_boxes[i, :3]
+
                 new_points.append(cluster)
 
+            if self.keep_orientation:
+                # rotate the new boxs to follow
+                # the orientation of the old ones
+                new_boxes[:, -1] = removed_boxes[:, -1]
             new_points = np.concatenate(new_points, axis=0)
             involved_boxes = np.concatenate(
-                                 [new_boxes, gt_boxes[removed_box_indices]],
-                                 axis=0,
+                                 [new_boxes, removed_boxes], axis=0,
                              )
             
             corners = box_np_ops.center_to_corner_box3d(
