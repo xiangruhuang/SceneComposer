@@ -199,10 +199,11 @@ class LoadPointCloudAnnotations(object):
                 "velocities": info["gt_boxes_velocity"].astype(np.float32),
             }
         elif res["type"] == 'WaymoDataset' and "gt_boxes" in info:
+            unique_ids = info.get("unique_ids", None)
             res["lidar"]["annotations"] = {
                 "boxes": info["gt_boxes"].astype(np.float32),
                 "names": info["gt_names"],
-                "unique_ids": info["unique_ids"],
+                "unique_ids": unique_ids,
             }
         else:
             pass 
