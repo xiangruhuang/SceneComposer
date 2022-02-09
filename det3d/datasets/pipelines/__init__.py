@@ -4,7 +4,7 @@ from .formating import Reformat
 # from .loading import LoadAnnotations, LoadImageFromFile, LoadProposals
 from .loading import *
 from .test_aug import DoubleFlip
-from .preprocess import Preprocess, Voxelization
+from .preprocess import Preprocess, Voxelization, SeparateForeground
 from .augmentation import *
 
 __all__ = [
@@ -26,4 +26,5 @@ __all__ = [
     "AffineAug",
     "GTAug",
     "ReplaceAug",
+    "SeparateForeground",
 ]

@@ -9,7 +9,8 @@ from .registry import (
     NECKS,
     READERS,
     SECOND_STAGE,
-    ROI_HEAD
+    ROI_HEAD,
+    COMPOSERS
 )
 
 
@@ -26,6 +27,8 @@ def build_second_stage_module(cfg):
 def build_roi_head(cfg):
     return build(cfg, ROI_HEAD)
 
+def build_composer(cfg, train_cfg=None, test_cfg=None):
+    return build(cfg, COMPOSERS, dict(train_cfg=train_cfg, test_cfg=test_cfg))
 
 def build_reader(cfg):
     return build(cfg, READERS)

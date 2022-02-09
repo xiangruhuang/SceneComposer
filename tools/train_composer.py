@@ -12,20 +12,20 @@ import numpy as np
 import torch
 import yaml
 from det3d.datasets import build_dataset
-from det3d.models import build_detector
+from det3d.models import build_composer
 from det3d.torchie import Config
 from det3d.torchie.apis import (
     build_optimizer,
     get_root_logger,
     init_dist,
     set_random_seed,
-    train_detector,
+    train_composer,
 )
 import torch.distributed as dist
 import subprocess
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train a detector")
+    parser = argparse.ArgumentParser(description="Train a composer")
     parser.add_argument("config", help="train config file path")
     parser.add_argument("--work_dir", help="the dir to save logs and models")
     parser.add_argument("--resume_from", help="the checkpoint file to resume from")
@@ -138,10 +138,31 @@ def main():
         logger.info("Set random seed to {}".format(args.seed))
         set_random_seed(args.seed)
 
+    model = build_composer(cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
+
     datasets = [build_dataset(cfg.data.train)]
 
-    print('testing data loading pipeline')
-    print(datasets[0][0])
+    if len(cfg.workflow) == 2:
+        datasets.append(build_dataset(cfg.data.val))
+
+    if cfg.checkpoint_config is not None:
+        # save det3d version, config file content and class names in
+        # checkpoints as meta data
+        cfg.checkpoint_config.meta = dict(
+            config=cfg.text, CLASSES=datasets[0].CLASSES
+        )
+
+    # add an attribute for visualization convenience
+    model.CLASSES = datasets[0].CLASSES
+    train_composer(
+        model,
+        datasets,
+        cfg,
+        distributed=distributed,
+        validate=args.validate,
+        logger=logger,
+    )
+
 
 if __name__ == "__main__":
     main()

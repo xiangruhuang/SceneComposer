@@ -1,6 +1,7 @@
 import numpy as np
 
 from det3d.core.bbox import box_np_ops
+from det3d.core.bbox.geometry import points_in_convex_polygon_3d_jit
 from det3d.core.sampler import preprocess as prep
 from det3d.builder import build_dbsampler
 
@@ -23,6 +24,54 @@ def drop_arrays_by_name(gt_names, used_classes):
     inds = [i for i, x in enumerate(gt_names) if x not in used_classes]
     inds = np.array(inds, dtype=np.int64)
     return inds
+
+
+@PIPELINES.register_module
+class SeparateForeground(object):
+    def __init__(self, cfg, **kwargs):
+        self.mode = cfg.mode
+        self.class_names = cfg['class_names']
+
+    def __call__(self, res, info):
+        
+        objects = {class_name: None for class_name in self.class_names}
+
+        points = res["lidar"]["points"]
+
+        if self.mode == "train":
+            gt_dict = res["lidar"]["annotations"]
+            gt_boxes = gt_dict["gt_boxes"]
+            gt_names = gt_dict["gt_names"]
+
+            for class_name in self.class_names:
+                mask = gt_names == class_name
+                if not mask.any():
+                    continue
+                obj_boxes = gt_boxes[mask]
+                num_obj = obj_boxes.shape[0]
+                corners = box_np_ops.center_to_corner_box3d(
+                              obj_boxes[:, :3],
+                              obj_boxes[:, 3:6],
+                              obj_boxes[:, -1],
+                              axis=2
+                          )
+                surfaces = box_np_ops.corner_to_surfaces_3d(corners)
+                indices = points_in_convex_polygon_3d_jit(
+                              points[:, :3], surfaces
+                          )
+                
+                obj_points = points[indices.any(-1)]
+                points = points[indices.any(-1) == False]
+                obj_ids = indices[indices.any(-1)].astype(np.int32).argmax(-1)
+                objects[class_name] = dict(points=obj_points,
+                                           indices=obj_ids,
+                                           boxes=obj_boxes)
+
+        res["lidar"]["objects"] = objects 
+        res["lidar"]["points"] = points
+
+        return res, info
+
 
 @PIPELINES.register_module
 class Preprocess(object):

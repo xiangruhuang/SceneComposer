@@ -12,11 +12,13 @@ from .builder import (
     build_head,
     build_loss,
     build_neck,
-    build_roi_head
+    build_roi_head,
+    build_composer,
 )
 from .detectors import *  # noqa: F401,F403
 from .necks import *  # noqa: F401,F403
 from .readers import *
+from .composer import *
 from .registry import (
     BACKBONES,
     DETECTORS,
@@ -24,6 +26,7 @@ from .registry import (
     LOSSES,
     NECKS,
     READERS,
+    COMPOSERS,
 )
 from .second_stage import * 
 from .roi_heads import * 
@@ -40,4 +43,5 @@ __all__ = [
     "build_head",
     "build_loss",
     "build_detector",
+    "build_composer",
 ]

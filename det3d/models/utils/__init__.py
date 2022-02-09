@@ -1,4 +1,5 @@
 from .conv_module import ConvModule, build_conv_layer
+from .mlp_module import MLP, build_mlp_layer
 from .conv_ws import ConvWS2d, conv_ws_2d
 from .misc import (
     Empty,
@@ -42,4 +43,6 @@ __all__ = [
     "get_printer",
     "register_hook",
     "get_paddings_indicator",
+    "build_mlp_layer",
+    "MLP",
 ]

@@ -136,6 +136,24 @@ def collate_kitti(batch_list, samples_per_gpu=1):
                 ret[key][k1] = torch.tensor(np.stack(v1, axis=0))
         elif key == "points":
             ret[key] = [torch.tensor(elem) for elem in elems]
+        elif key == "objects":
+            obj_indices = defaultdict(list)
+            obj_points = defaultdict(list)
+            obj_boxes = defaultdict(list)
+            for elem in elems:
+                for class_name in elem.keys():
+                    elem_cls = elem[class_name]
+                    if elem_cls is None:
+                        obj_indices[class_name].append(None)
+                        obj_points[class_name].append(None)
+                        obj_boxes[class_name].append(None)
+                    else:
+                        obj_indices[class_name].append(torch.tensor(elem_cls["indices"]))
+                        obj_points[class_name].append(torch.tensor(elem_cls["points"]))
+                        obj_boxes[class_name].append(torch.tensor(elem_cls["boxes"]))
+            ret[key] = dict(indices=obj_indices,
+                            points=obj_points,
+                            boxes=obj_boxes)
         elif key in ["coordinates", "cyv_coordinates"]:
             coors = []
             for i, coor in enumerate(elems):
