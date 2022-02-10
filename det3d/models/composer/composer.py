@@ -40,6 +40,7 @@ class Generator(nn.Module):
             )
 
         x = self.neck(x)
+        import ipdb; ipdb.set_trace()
 
         return x, voxel_feature
 
@@ -47,13 +48,13 @@ class Generator(nn.Module):
         import ipdb; ipdb.set_trace()
 
         objects = data['objects']
-        for class_name in objects.keys():
-            objects_cls = objects[class_name]
+        points = objects['points']
+        pos = points[:, :3]
+        x = points[:, 3:]
+        batch = objects['batch'].long()
+        obj_feature = self.obj_backbone(x, pos, batch)
 
-        self.obj_backbone(
-                data['objects'],
-
-            )
+        return obj_feature, coord
         
     def forward(self, example, **kwargs):
 

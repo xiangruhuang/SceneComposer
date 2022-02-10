@@ -34,40 +34,60 @@ class SeparateForeground(object):
 
     def __call__(self, res, info):
         
-        objects = {class_name: None for class_name in self.class_names}
+        assert self.mode == "train"
 
         points = res["lidar"]["points"]
 
-        if self.mode == "train":
-            gt_dict = res["lidar"]["annotations"]
-            gt_boxes = gt_dict["gt_boxes"]
+        objects = dict(
+            points=np.zeros((0, points.shape[1]), dtype=np.float32),
+            batch=np.zeros(0, dtype=np.int32),
+            boxes=np.zeros((0, 9), dtype=np.float32),
+            classes=np.zeros(0, dtype=np.int32),
+        )
+        
+        gt_dict = res["lidar"]["annotations"]
+        gt_boxes = gt_dict["gt_boxes"]
+        if gt_boxes.shape[0] > 0:
             gt_names = gt_dict["gt_names"]
-
-            for class_name in self.class_names:
-                mask = gt_names == class_name
+            gt_classes = np.array([self.class_names.index(gt_name)
+                                   for gt_name in gt_names])
+            
+            # find points that are in the boxes
+            gt_corners = box_np_ops.center_to_corner_box3d(
+                             gt_boxes[:, :3],
+                             gt_boxes[:, 3:6],
+                             gt_boxes[:, -1],
+                             axis=2
+                         )
+            surfaces = box_np_ops.corner_to_surfaces_3d(gt_corners)
+            indices = points_in_convex_polygon_3d_jit(
+                          points[:, :3], surfaces
+                      )
+            
+            obj_points, batch = [], [] 
+            obj_count = 0
+            for b in range(gt_boxes.shape[0]):
+                mask = indices[:, b]
                 if not mask.any():
+                    # empty box
                     continue
-                obj_boxes = gt_boxes[mask]
-                num_obj = obj_boxes.shape[0]
-                corners = box_np_ops.center_to_corner_box3d(
-                              obj_boxes[:, :3],
-                              obj_boxes[:, 3:6],
-                              obj_boxes[:, -1],
-                              axis=2
-                          )
-                surfaces = box_np_ops.corner_to_surfaces_3d(corners)
-                indices = points_in_convex_polygon_3d_jit(
-                              points[:, :3], surfaces
-                          )
-                
-                obj_points = points[indices.any(-1)]
-                points = points[indices.any(-1) == False]
-                obj_ids = indices[indices.any(-1)].astype(np.int32).argmax(-1)
-                objects[class_name] = dict(points=obj_points,
-                                           indices=obj_ids,
-                                           boxes=obj_boxes)
+                points_b = points[mask]
+                obj_points.append(points_b)
+                batch_b = np.zeros(points_b.shape[0], dtype=np.int32)+obj_count
+                batch.append(batch_b)
+                obj_count += 1
+            obj_points = np.concatenate(obj_points, axis=0)
+            batch = np.concatenate(batch, axis=0)
 
-        res["lidar"]["objects"] = objects 
+            points = points[indices.any(-1) == False]
+            objects = dict(
+                points=obj_points,
+                batch=batch,
+                boxes=gt_boxes,
+                classes=gt_classes,
+            )
+
+        res["lidar"]["objects"] = objects
         res["lidar"]["points"] = points
 
         return res, info

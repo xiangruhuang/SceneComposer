@@ -137,23 +137,29 @@ def collate_kitti(batch_list, samples_per_gpu=1):
         elif key == "points":
             ret[key] = [torch.tensor(elem) for elem in elems]
         elif key == "objects":
-            obj_indices = defaultdict(list)
-            obj_points = defaultdict(list)
-            obj_boxes = defaultdict(list)
-            for elem in elems:
-                for class_name in elem.keys():
-                    elem_cls = elem[class_name]
-                    if elem_cls is None:
-                        obj_indices[class_name].append(None)
-                        obj_points[class_name].append(None)
-                        obj_boxes[class_name].append(None)
-                    else:
-                        obj_indices[class_name].append(torch.tensor(elem_cls["indices"]))
-                        obj_points[class_name].append(torch.tensor(elem_cls["points"]))
-                        obj_boxes[class_name].append(torch.tensor(elem_cls["boxes"]))
-            ret[key] = dict(indices=obj_indices,
-                            points=obj_points,
-                            boxes=obj_boxes)
+            objects = {}
+            offset = 0
+            for i, elem in enumerate(elems):
+                scene_idx = torch.zeros(elem['boxes'].shape[0],
+                                        dtype=torch.long) + i 
+                coord = np.concatenate(
+                            [elem['boxes'][:, :3], scene_idx[:, np.newaxis]],
+                            axis=-1
+                        )
+                elem['coord'] = torch.tensor(coord)
+                for key_ in elem.keys():
+                    if objects.get(key_, None) is None:
+                        objects[key_] = []
+                    val = elem[key_]
+                    if key_ == 'batch':
+                        val += offset
+                    objects[key_].append(val)
+                offset += elem['batch'].max() + 1
+            for key_ in objects.keys():
+                objects[key_] = torch.tensor(
+                    np.concatenate(objects[key_], axis=0),
+                )
+            ret[key] = objects
         elif key in ["coordinates", "cyv_coordinates"]:
             coors = []
             for i, coor in enumerate(elems):

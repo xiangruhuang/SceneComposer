@@ -30,8 +30,9 @@ model = dict(
         type="SpMiddleResNetFHD", num_input_features=5, ds_factor=8),
     obj_backbone=dict(
         type='PointTransformer',
-        in_channels=5,
-        out_channels=128,
+        in_channels=2,
+        out_channels=512,
+        dim_model=[32, 64, 128, 256, 512],
         ),
     neck=dict(
         type="RPN",
@@ -100,7 +101,7 @@ val_preprocessor = dict(
 )
 
 voxel_generator = dict(
-    range=[-75.2, -75.2, -2, 75.2, 75.2, 4],
+    range=[-80, -75.2, -2, 80, 75.2, 4],
     voxel_size=[0.1, 0.1, 0.15],
     max_points_in_voxel=5,
     max_voxel_num=[150000, 200000],
@@ -133,8 +134,8 @@ val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=5,
-    workers_per_gpu=5,
+    samples_per_gpu=1,
+    workers_per_gpu=1,
     train=dict(
         type=dataset_type,
         root_path=data_root,
