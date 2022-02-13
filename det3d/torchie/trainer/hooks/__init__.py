@@ -2,7 +2,7 @@ from .checkpoint import CheckpointHook
 from .closure import ClosureHook
 from .hook import Hook
 from .iter_timer import IterTimerHook
-from .logger import LoggerHook, PaviLoggerHook, TensorboardLoggerHook, TextLoggerHook
+from .logger import LoggerHook, PaviLoggerHook, TensorboardLoggerHook, TextLoggerHook, ComposerTextLoggerHook
 from .lr_updater import LrUpdaterHook
 from .memory import EmptyCacheHook
 from .optimizer import OptimizerHook
@@ -18,6 +18,7 @@ __all__ = [
     "DistSamplerSeedHook",
     "EmptyCacheHook",
     "LoggerHook",
+    "ComposerTextLoggerHook",
     "TextLoggerHook",
     "PaviLoggerHook",
     "TensorboardLoggerHook",

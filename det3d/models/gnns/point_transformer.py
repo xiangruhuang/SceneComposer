@@ -9,23 +9,27 @@ from torch_scatter import scatter_max
 from torch_geometric.nn.pool import knn
 from torch_geometric.nn import global_mean_pool
 
-from ..registry import BACKBONES
+from ..registry import GNNS
 from ..utils import build_norm_layer, build_mlp_layer
 
+@GNNS.register_module
 class TransformerBlock(nn.Module):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, point_dim=3):
         super().__init__()
         self.lin_in = nn.Linear(in_channels, in_channels)
         self.lin_out = nn.Linear(out_channels, out_channels)
 
-        self.pos_nn = build_mlp_layer([3, 64, out_channels], batch_norm=False)
+        self.pos_nn = build_mlp_layer([point_dim, 64, out_channels], batch_norm=False)
 
         self.attn_nn = build_mlp_layer([out_channels, 64, out_channels],
                                        batch_norm=False)
 
-        self.transformer = PointTransformerConv(in_channels, out_channels,
-                                                pos_nn=self.pos_nn,
-                                                attn_nn=self.attn_nn)
+        self.transformer = PointTransformerConv(
+                               in_channels,
+                               out_channels,
+                               pos_nn=self.pos_nn,
+                               attn_nn=self.attn_nn
+                           )
 
     def forward(self, x, pos, edge_index):
         x = self.lin_in(x).relu()
@@ -68,7 +72,7 @@ class TransitionDown(nn.Module):
         return out, sub_pos, sub_batch
 
 
-@BACKBONES.register_module
+@GNNS.register_module
 class PointTransformer(nn.Module):
     def __init__(self, in_channels, out_channels, dim_model, k=16):
         super().__init__()
@@ -97,10 +101,13 @@ class PointTransformer(nn.Module):
                 out_channels=dim_model[i + 1]))
 
         # class score computation
-        self.mlp_output = nn.Sequential(nn.Linear(dim_model[-1], 64),
-                                        nn.ReLU(),
-                                        nn.Linear(64, 64),
-                                        nn.ReLU(), nn.Linear(64, out_channels))
+        self.mlp_output = nn.Sequential(
+                              nn.Linear(dim_model[-1], 64),
+                              nn.ReLU(),
+                              nn.Linear(64, 64),
+                              nn.ReLU(),
+                              nn.Linear(64, out_channels)
+                          )
 
     def forward(self, x, pos, batch=None):
         # add dummy features in case there is none
@@ -119,8 +126,7 @@ class PointTransformer(nn.Module):
         # GlobalAveragePooling
         x = global_mean_pool(x, batch)
         
-        # Class score
         out = self.mlp_output(x)
 
-        return F.log_softmax(out, dim=-1)
+        return out
 

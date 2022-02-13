@@ -97,7 +97,12 @@ class SparseBasicBlock(spconv.SparseModule):
 @BACKBONES.register_module
 class SpMiddleResNetFHD(nn.Module):
     def __init__(
-        self, num_input_features=128, norm_cfg=None, name="SpMiddleResNetFHD", **kwargs
+        self,
+        num_input_features=128,
+        channels=[16, 32, 64, 128],
+        norm_cfg=None,
+        name="SpMiddleResNetFHD",
+        **kwargs
     ):
         super(SpMiddleResNetFHD, self).__init__()
         self.name = name
@@ -108,54 +113,65 @@ class SpMiddleResNetFHD(nn.Module):
         if norm_cfg is None:
             norm_cfg = dict(type="BN1d", eps=1e-3, momentum=0.01)
 
+        c0, c1, c2, c3 = channels
+
         # input: # [1600, 1200, 41]
         self.conv_input = spconv.SparseSequential(
-            SubMConv3d(num_input_features, 16, 3, bias=False, indice_key="res0"),
-            build_norm_layer(norm_cfg, 16)[1],
+            SubMConv3d(num_input_features, c0, 3, bias=False, indice_key="res0"),
+            build_norm_layer(norm_cfg, c0)[1],
             nn.ReLU(inplace=True)
         )
 
-        self.conv1 = spconv.SparseSequential(        
-            SparseBasicBlock(16, 16, norm_cfg=norm_cfg, indice_key="res0"),
-            SparseBasicBlock(16, 16, norm_cfg=norm_cfg, indice_key="res0"),
+        self.conv1 = spconv.SparseSequential(
+            SparseBasicBlock(c0, c0, norm_cfg=norm_cfg, indice_key="res0"),
+            SparseBasicBlock(c0, c0, norm_cfg=norm_cfg, indice_key="res0"),
         )
 
         self.conv2 = spconv.SparseSequential(
             SparseConv3d(
-                16, 32, 3, 2, padding=1, bias=False
+                c0, c1, 3, 2, padding=1, bias=False
             ),  # [1600, 1200, 41] -> [800, 600, 21]
-            build_norm_layer(norm_cfg, 32)[1],
+            build_norm_layer(norm_cfg, c1)[1],
             nn.ReLU(inplace=True),
-            SparseBasicBlock(32, 32, norm_cfg=norm_cfg, indice_key="res1"),
-            SparseBasicBlock(32, 32, norm_cfg=norm_cfg, indice_key="res1"),
+            SparseBasicBlock(c1, c1, norm_cfg=norm_cfg, indice_key="res1"),
+            SparseBasicBlock(c1, c1, norm_cfg=norm_cfg, indice_key="res1"),
         )
 
         self.conv3 = spconv.SparseSequential(
             SparseConv3d(
-                32, 64, 3, 2, padding=1, bias=False
+                c1, c2, 3, 2, padding=1, bias=False
             ),  # [800, 600, 21] -> [400, 300, 11]
-            build_norm_layer(norm_cfg, 64)[1],
+            build_norm_layer(norm_cfg, c2)[1],
             nn.ReLU(inplace=True),
-            SparseBasicBlock(64, 64, norm_cfg=norm_cfg, indice_key="res2"),
-            SparseBasicBlock(64, 64, norm_cfg=norm_cfg, indice_key="res2"),
+            SparseBasicBlock(c2, c2, norm_cfg=norm_cfg, indice_key="res2"),
+            SparseBasicBlock(c2, c2, norm_cfg=norm_cfg, indice_key="res2"),
         )
 
         self.conv4 = spconv.SparseSequential(
             SparseConv3d(
-                64, 128, 3, 2, padding=[0, 1, 1], bias=False
+                c2, c3, 3, 2, padding=[0, 1, 1], bias=False
             ),  # [400, 300, 11] -> [200, 150, 5]
-            build_norm_layer(norm_cfg, 128)[1],
+            build_norm_layer(norm_cfg, c3)[1],
             nn.ReLU(inplace=True),
-            SparseBasicBlock(128, 128, norm_cfg=norm_cfg, indice_key="res3"),
-            SparseBasicBlock(128, 128, norm_cfg=norm_cfg, indice_key="res3"),
+            SparseBasicBlock(c3, c3, norm_cfg=norm_cfg, indice_key="res3"),
+            SparseBasicBlock(c3, c3, norm_cfg=norm_cfg, indice_key="res3"),
         )
-
+        
+        #self.conv5 = spconv.SparseSequential(
+        #    SparseConv3d(
+        #        128, 128, 3, (1, 2, 2), padding=[1, 1, 1], bias=False
+        #    ),  # [188, 188, 5] -> [93, 93, 5]
+        #    build_norm_layer(norm_cfg, 128)[1],
+        #    nn.ReLU(inplace=True),
+        #    SparseBasicBlock(128, 128, norm_cfg=norm_cfg, indice_key="res4"),
+        #    SparseBasicBlock(128, 128, norm_cfg=norm_cfg, indice_key="res4"),
+        #)
 
         self.extra_conv = spconv.SparseSequential(
             SparseConv3d(
-                128, 128, (3, 1, 1), (2, 1, 1), bias=False
+                c3, c3, (3, 1, 1), (2, 1, 1), bias=False
             ),  # [200, 150, 5] -> [200, 150, 2]
-            build_norm_layer(norm_cfg, 128)[1],
+            build_norm_layer(norm_cfg, c3)[1],
             nn.ReLU(),
         )
 

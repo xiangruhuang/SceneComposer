@@ -6,6 +6,8 @@ if found:
 else:
     print("No spconv, sparse convolution disabled!")
 from .bbox_heads import *  # noqa: F401,F403
+from .generator_heads import *  # noqa: F401,F403
+from .gnns import *
 from .builder import (
     build_backbone,
     build_detector,
@@ -14,6 +16,7 @@ from .builder import (
     build_neck,
     build_roi_head,
     build_composer,
+    build_gnn,
 )
 from .detectors import *  # noqa: F401,F403
 from .necks import *  # noqa: F401,F403
@@ -27,6 +30,7 @@ from .registry import (
     NECKS,
     READERS,
     COMPOSERS,
+    GNNS,
 )
 from .second_stage import * 
 from .roi_heads import * 
@@ -44,4 +48,5 @@ __all__ = [
     "build_loss",
     "build_detector",
     "build_composer",
+    "build_gnn",
 ]

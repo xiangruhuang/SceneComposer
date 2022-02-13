@@ -15,58 +15,102 @@ target_assigner = dict(
     tasks=tasks,
 )
 
+composer_backbone = dict(
+    type='ComposerBackbone',
+    bg_feat_module=dict(
+        reader=dict(
+            type="VoxelFeatureExtractorV3",
+            num_input_features=5,
+        ),
+        backbone=dict(
+            type="SpMiddleResNetFHD",
+            num_input_features=5,
+            channels=[16, 32, 32, 32],
+            ds_factor=8
+        ),
+        neck=dict(
+            type="RPN",
+            layer_nums=[5, 5],
+            ds_layer_strides=[1, 2],
+            ds_num_filters=[32, 64],
+            us_layer_strides=[1, 2],
+            us_num_filters=[64, 64],
+            num_input_features=64,
+            logger=logging.getLogger("RPN"),
+        ),
+    ),
+    obj_feat_module=dict(
+        point_gnn=None,
+        #dict(
+        #    type='PointTransformer',
+        #    in_channels=2,
+        #    out_channels=448,
+        #    dim_model=[32, 64, 128, 256, 448],
+        #),
+        box_mlp=dict(
+            channels=[10, 128],
+            num_classes=3,
+        ),
+    ),
+    feat_prop_module=dict(
+        type='PointTransformerSeg',
+        in_channels=128,
+        out_channels=512,
+        point_dim=2,
+        down_transf_layers=[2,3],
+        up_transf_layers=[2,3],
+        dim_model=[128,256,512],
+    ),
+)
+
+generator = dict(
+    backbone=composer_backbone,
+    heads=dict(
+        box=dict(
+            type="BoxGenHead",
+            in_channels=sum([256, 256]),
+            tasks=tasks,
+            dataset='waymo',
+            weight=2,
+            code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+            common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
+        ),
+        point=None,
+    ),
+)
+
+discriminator = dict(
+    backbone=composer_backbone,
+    heads=dict(
+        box=dict(
+            type="ObjRegHead",
+            channels=[512, 256, 128, 1],
+            dataset='waymo',
+        ),
+        point=None,
+    ),
+)
+
 # model settings
 model = dict(
     type="Composer",
-    pretrained=None,
-    reader=dict(
-        #type="DynamicVoxelEncoder",
-        #pc_range=[-75.2, -75.2, -2, 75.2, 75.2, 4],
-        #voxel_size=[0.1, 0.1, 0.15],
-        type="VoxelFeatureExtractorV3",
-        num_input_features=5,
-    ),
-    backbone=dict(
-        type="SpMiddleResNetFHD", num_input_features=5, ds_factor=8),
-    obj_backbone=dict(
-        type='PointTransformer',
-        in_channels=2,
-        out_channels=512,
-        dim_model=[32, 64, 128, 256, 512],
-        ),
-    neck=dict(
-        type="RPN",
-        layer_nums=[5, 5],
-        ds_layer_strides=[1, 2],
-        ds_num_filters=[128, 256],
-        us_layer_strides=[1, 2],
-        us_num_filters=[256, 256],
-        num_input_features=256,
-        logger=logging.getLogger("RPN"),
-    ),
-    bbox_head=dict(
-        type="CenterHead",
-        in_channels=sum([256, 256]),
-        tasks=tasks,
-        dataset='waymo',
-        weight=2,
-        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
-    ),
+    generator=generator,
+    discriminator=discriminator,
 )
 
 assigner = dict(
     target_assigner=target_assigner,
-    out_size_factor=get_downsample_factor(model),
+    out_size_factor=get_downsample_factor(composer_backbone['bg_feat_module']),
     dense_reg=1,
     gaussian_overlap=0.1,
     max_objs=500,
     min_radius=2,
 )
 
-
-train_cfg = dict(assigner=assigner)
-
+train_cfg = dict(
+    assigner=assigner,
+    class_names=class_names,
+)
 
 test_cfg = dict(
     post_center_limit_range=[-80, -80, -10.0, 80, 80, 10.0],
@@ -78,8 +122,9 @@ test_cfg = dict(
         nms_iou_threshold=0.7,
     ),
     score_threshold=0.1,
+    max_num_objs=500,
     pc_range=[-75.2, -75.2],
-    out_size_factor=get_downsample_factor(model),
+    out_size_factor=get_downsample_factor(composer_backbone['bg_feat_module']),
     voxel_size=[0.1, 0.1],
 )
 
@@ -101,7 +146,7 @@ val_preprocessor = dict(
 )
 
 voxel_generator = dict(
-    range=[-80, -75.2, -2, 80, 75.2, 4],
+    range=[-75.2, -75.2, -2, 75.2, 75.2, 4],
     voxel_size=[0.1, 0.1, 0.15],
     max_points_in_voxel=5,
     max_voxel_num=[150000, 200000],
@@ -134,8 +179,8 @@ val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=1,
+    samples_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -181,9 +226,9 @@ lr_config = dict(
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=5,
+    interval=1,
     hooks=[
-        dict(type="TextLoggerHook"),
+        dict(type="ComposerTextLoggerHook"),
         # dict(type='TensorboardLoggerHook')
     ],
 )

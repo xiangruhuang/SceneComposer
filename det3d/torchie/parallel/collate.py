@@ -159,7 +159,14 @@ def collate_kitti(batch_list, samples_per_gpu=1):
                 objects[key_] = torch.tensor(
                     np.concatenate(objects[key_], axis=0),
                 )
-            ret[key] = objects
+            ret[key] = dict(
+                points=objects['points'],
+                batch=objects['batch'],
+                boxes=objects['boxes'],
+                labels=objects['classes'],
+                coord=objects['coord'],
+                gt=torch.ones(objects['boxes'].shape[0], dtype=torch.long),
+            )
         elif key in ["coordinates", "cyv_coordinates"]:
             coors = []
             for i, coor in enumerate(elems):
