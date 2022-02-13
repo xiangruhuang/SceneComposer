@@ -69,7 +69,8 @@ class ComposerTextLoggerHook(LoggerHook):
         trainer.logger.info(log_str)
 
         for prefix, task in zip(['gen', 'dsc'], ['Generator', 'Discriminator']):
-            log_str = f"{task}: "
+            log_str = ""
+            log_items = [f"Module : {task}"]
 
             for loss_name, loss_value in log_dict.items():
                 if not loss_name.startswith(prefix):
@@ -77,8 +78,15 @@ class ComposerTextLoggerHook(LoggerHook):
                 loss_name = loss_name[4:]
                 assert len(loss_value) == 1
 
-                log_str += f"{loss_name}: {loss_value[0]:.3f}, "
+                if len(loss_value) == 1:
+                    loss_value = self._convert_to_precision4(loss_value[0])
+                else:
+                    loss_value = self._convert_to_precision4(loss_value)
+                log_items.append(
+                    f"{loss_name}: {loss_value}"
+                )
             
+            log_str += ", ".join(log_items)
             trainer.logger.info(log_str)
 
     def _dump_log(self, log_dict, trainer):

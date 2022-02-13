@@ -40,11 +40,16 @@ class Discriminator(nn.Module):
 
         gt = gt.long()
         loss = -(preds[gt == 1].log().mean() + (1-preds[gt == 0]).log().mean())
-        acc = (preds.round().long() == gt).float().mean()
+        acc = (preds.round().long() == gt).float()
+        acc0 = acc[gt == 0].mean()
+        acc1 = acc[gt == 1].mean()
+        acc = acc.mean()
 
         return dict(
             loss=loss,
-            dsc_acc=[acc],
+            dsc_overall=[acc],
+            dsc_gt=[acc1],
+            dsc_fake=[acc0],
         )
 
 class Generator(nn.Module):

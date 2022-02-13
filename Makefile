@@ -10,4 +10,4 @@ run:
 
 composer:
 	$(eval dirname := $(basename $(shell basename $(config))))
-	OMP_NUM_THREADS=60 CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7 python -m torch.distributed.launch --nproc_per_node=7 tools/train_composer.py $(config) --work_dir work_dirs/$(dirname)/ 
+	OMP_NUM_THREADS=60 python -m torch.distributed.launch --nproc_per_node=8 tools/train_composer.py $(config) --work_dir work_dirs/$(dirname)/ 
