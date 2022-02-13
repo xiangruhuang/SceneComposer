@@ -122,7 +122,7 @@ test_cfg = dict(
         nms_iou_threshold=0.7,
     ),
     score_threshold=0.1,
-    max_num_objs=500,
+    max_num_objs=50,
     pc_range=[-75.2, -75.2],
     out_size_factor=get_downsample_factor(composer_backbone['bg_feat_module']),
     voxel_size=[0.1, 0.1],
@@ -179,8 +179,8 @@ val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -189,6 +189,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
+        load_interval=10,
     ),
     val=dict(
         type=dataset_type,
@@ -226,7 +227,7 @@ lr_config = dict(
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=20,
+    interval=5,
     hooks=[
         dict(type="ComposerTextLoggerHook"),
         # dict(type='TensorboardLoggerHook')

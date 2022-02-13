@@ -309,7 +309,7 @@ class BoxGenHead(nn.Module):
 
             batch_hm = torch.sigmoid(preds_dict['hm'])
 
-            batch_dim = preds_dict['dim']
+            batch_dim = torch.exp(preds_dict['dim'].clip(-5, 5))
 
             batch_rots = preds_dict['rot'][..., 0:1]
             batch_rotc = preds_dict['rot'][..., 1:2]
@@ -329,7 +329,8 @@ class BoxGenHead(nn.Module):
             batch_rots = batch_rots.reshape(batch, H*W, 1)
             batch_rotc = batch_rotc.reshape(batch, H*W, 1)
 
-            ys, xs = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)])
+            ys, xs = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)],
+                                    indexing="ij")
             ys = ys.view(1, H, W).repeat(batch, 1, 1).to(batch_hm)
             xs = xs.view(1, H, W).repeat(batch, 1, 1).to(batch_hm)
 

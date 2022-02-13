@@ -27,11 +27,12 @@ class Discriminator(nn.Module):
 
     def forward(self, data, objects, test_cfg):
         
-        voxel_feat, obj_feat = self.backbone(
-                                   data,
-                                   objects,
-                                   test_cfg
-                               )
+        obj_feat = self.backbone(
+                       data,
+                       objects,
+                       output_on='object',
+                       test_cfg=test_cfg
+                   )
 
         return self.box_head(obj_feat).squeeze(-1)
 
@@ -69,11 +70,12 @@ class Generator(nn.Module):
         
     def forward(self, data, gt_objects, test_cfg, **kwargs):
         
-        voxel_feat, obj_feat = self.backbone(
-                                   data,
-                                   gt_objects,
-                                   test_cfg
-                               )
+        voxel_feat = self.backbone(
+                         data,
+                         gt_objects,
+                         output_on='background',
+                         test_cfg=test_cfg,
+                     )
 
         preds_dicts, _ = self.box_head(voxel_feat)
 
@@ -150,7 +152,7 @@ class Composer(nn.Module):
 
         preds = self.discriminator(data, all_objects, self.test_cfg, **kwargs)
         
-        preds_on_fake = preds[all_objects['gt'].long()==1]
+        preds_on_fake = preds[all_objects['gt'].long()==0]
 
         loss_gen = self.generator.loss(preds_on_fake)
         loss_dsc = self.discriminator.loss(preds, all_objects['gt'])

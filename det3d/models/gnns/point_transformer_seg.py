@@ -123,7 +123,7 @@ class PointTransformerSeg(nn.Module):
             nn.Linear(64, out_channels)
         )
 
-    def forward(self, x, pos, batch=None):
+    def forward(self, x, pos, batch=None, output_mask=None):
 
         # add dummy features in case there is none
         if x is None:
@@ -162,13 +162,27 @@ class PointTransformerSeg(nn.Module):
         # backbone up : augment cardinality and reduce dimensionnality
         n = len(self.transformers_down)
         for i in range(n):
+            
+            sub_graph = dict(
+                x_sub = x,
+                pos_sub = out_pos[-i - 1],
+                batch_sub = out_batch[-i - 1],
+            )
+
+            if (i == n-1) and (output_mask is not None):
+                out_x[-i - 2] = out_x[-i - 2][output_mask]
+                out_pos[-i - 2] = out_pos[-i - 2][output_mask]
+                out_batch[-i - 2] = out_batch[-i - 2][output_mask]
+
+            super_graph = dict(
+                x=out_x[-i - 2],
+                pos=out_pos[-i - 2],
+                batch=out_batch[-i - 2],
+            )
+            
             x = self.transition_up[-i - 1](
-                    x=out_x[-i - 2],
-                    x_sub=x,
-                    pos=out_pos[-i - 2],
-                    pos_sub=out_pos[-i - 1],
-                    batch_sub=out_batch[-i - 1],
-                    batch=out_batch[-i - 2]
+                    **sub_graph,
+                    **super_graph,
                 )
 
             if (len(self.transformers_up)-1-i) in self.up_transf_layers:

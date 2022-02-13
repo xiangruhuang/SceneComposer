@@ -48,6 +48,7 @@ class BackgroundFeatureModule(nn.Module):
                                   torch.arange(x.shape[0]),
                                   torch.arange(x.shape[1]),
                                   torch.arange(x.shape[2]),
+                                  indexing="ij",
                               )
         
         coord = torch.stack([x_idx, y_idx], dim=-1).view(-1, 2) * factor
@@ -119,7 +120,7 @@ class ComposerBackbone(nn.Module):
 
         self.feat_prop_module = builder.build_gnn(feat_prop_module)
 
-    def forward(self, data, objects, test_cfg=None):
+    def forward(self, data, objects, output_on, test_cfg=None):
         
         x1, batch1, coord1 = self.bg_feat_module(data)
         x1_shape = x1.shape
@@ -131,6 +132,7 @@ class ComposerBackbone(nn.Module):
             e1, e2 = torch.meshgrid(
                         torch.arange(x1.shape[0]),
                         torch.arange(x2.shape[0]),
+                        indexing="ij",
                      )
             e1, e2 = e1.reshape(-1), e2.reshape(-1)
             edge_index = torch.stack([e1, e2], dim=0)
@@ -140,11 +142,17 @@ class ComposerBackbone(nn.Module):
         x = torch.cat([x1, x2], dim=0)
         batch = torch.cat([batch1, batch2], dim=0)
         coord = torch.cat([coord1, coord2], dim=0).float()
-        x_out = self.feat_prop_module(x, coord, batch)
-        x1_out = x_out[:x1.shape[0]]
-        x1_out = x1_out.reshape(*x1_shape[:3], -1)
-        x1_out = x1_out.transpose(1, 3)
 
-        x2_out = x_out[x1.shape[0]:]
+        mask = torch.zeros(x.shape[0], dtype=torch.bool).to(x.device)
+        if output_on == 'background':
+            mask[:x1.shape[0]] = True
+        elif output_on == 'object':
+            mask[x1.shape[0]:] = True
 
-        return x1_out, x2_out
+        x_out = self.feat_prop_module(x, coord, batch, output_mask=mask)
+
+        if output_on == 'background':
+            x_out = x_out.reshape(*x1_shape[:3], -1)
+            x_out = x_out.transpose(1, 3)
+
+        return x_out
