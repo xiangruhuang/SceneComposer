@@ -189,7 +189,6 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
-        load_interval=10,
     ),
     val=dict(
         type=dataset_type,
