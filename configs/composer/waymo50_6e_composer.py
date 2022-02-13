@@ -48,7 +48,7 @@ composer_backbone = dict(
         #    dim_model=[32, 64, 128, 256, 448],
         #),
         box_mlp=dict(
-            channels=[10, 128],
+            channels=[8+3, 128],
             num_classes=3,
         ),
     ),
@@ -68,7 +68,7 @@ generator = dict(
     heads=dict(
         box=dict(
             type="BoxGenHead",
-            in_channels=sum([256, 256]),
+            in_channels=512,
             tasks=tasks,
             dataset='waymo',
             weight=2,
@@ -226,7 +226,7 @@ lr_config = dict(
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=1,
+    interval=20,
     hooks=[
         dict(type="ComposerTextLoggerHook"),
         # dict(type='TensorboardLoggerHook')
@@ -234,7 +234,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 6
+total_epochs = 12
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

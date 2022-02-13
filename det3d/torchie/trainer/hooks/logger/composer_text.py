@@ -68,6 +68,19 @@ class ComposerTextLoggerHook(LoggerHook):
 
         trainer.logger.info(log_str)
 
+        for prefix, task in zip(['gen', 'dsc'], ['Generator', 'Discriminator']):
+            log_str = f"{task}: "
+
+            for loss_name, loss_value in log_dict.items():
+                if not loss_name.startswith(prefix):
+                    continue
+                loss_name = loss_name[4:]
+                assert len(loss_value) == 1
+
+                log_str += f"{loss_name}: {loss_value[0]:.3f}, "
+            
+            trainer.logger.info(log_str)
+
     def _dump_log(self, log_dict, trainer):
         json_log = OrderedDict()
         for k, v in log_dict.items():

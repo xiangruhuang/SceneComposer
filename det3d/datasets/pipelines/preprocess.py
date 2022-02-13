@@ -41,7 +41,7 @@ class SeparateForeground(object):
         objects = dict(
             points=np.zeros((0, points.shape[1]), dtype=np.float32),
             batch=np.zeros(0, dtype=np.int32),
-            boxes=np.zeros((0, 9), dtype=np.float32),
+            boxes=np.zeros((0, 8), dtype=np.float32),
             classes=np.zeros(0, dtype=np.int32),
         )
         
@@ -66,11 +66,10 @@ class SeparateForeground(object):
             
             obj_points, batch = [], [] 
             obj_count = 0
+            
             for b in range(gt_boxes.shape[0]):
                 mask = indices[:, b]
-                if not mask.any():
-                    # empty box
-                    continue
+                assert mask.any(), "empty box"
                 points_b = points[mask]
                 obj_points.append(points_b)
                 batch_b = np.zeros(points_b.shape[0], dtype=np.int32)+obj_count
@@ -80,10 +79,14 @@ class SeparateForeground(object):
             batch = np.concatenate(batch, axis=0)
 
             points = points[indices.any(-1) == False]
+            anno_boxes = np.concatenate([gt_boxes[:, :6],
+                                         np.sin(gt_boxes[:, -1:]),
+                                         np.cos(gt_boxes[:, -1:])],
+                                        axis=1)
             objects = dict(
                 points=obj_points,
                 batch=batch,
-                boxes=gt_boxes,
+                boxes=anno_boxes,
                 classes=gt_classes,
             )
 
@@ -97,7 +100,7 @@ class SeparateForeground(object):
 class Preprocess(object):
     def __init__(self, cfg=None, **kwargs):
         self.shuffle_points = cfg.shuffle_points
-        self.min_points_in_gt = cfg.get("min_points_in_gt", -1)
+        self.min_points_in_gt = cfg.get("min_points_in_gt", 1)
         
         self.mode = cfg.mode
         if self.mode == "train":

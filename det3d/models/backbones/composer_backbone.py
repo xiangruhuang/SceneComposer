@@ -75,12 +75,14 @@ class ObjectFeatureModule(nn.Module):
         self.num_classes = box_mlp['num_classes']
     
     def forward(self, objects):
+        """
+            objects: 'boxes', 'labels', 'points', 'batch', 'coord'
+        """
 
         boxes = objects['boxes']
-        num_objects = boxes.shape[0] 
+        num_objects = boxes.shape[0]
         labels = objects['labels']
         labels_one_hot = F.one_hot(labels, self.num_classes)
-        boxes = torch.cat([boxes[:, :6], boxes[:, -1:]], dim=-1)
         box_attr = torch.cat([boxes, labels_one_hot], dim=-1)
         obj_box_feature = self.box_mlp(box_attr)
 
@@ -117,22 +119,13 @@ class ComposerBackbone(nn.Module):
 
         self.feat_prop_module = builder.build_gnn(feat_prop_module)
 
-    def forward(self, data, gt_objects, pred_objects=None, test_cfg=None):
+    def forward(self, data, objects, test_cfg=None):
         
         x1, batch1, coord1 = self.bg_feat_module(data)
         x1_shape = x1.shape
         x1 = x1.reshape(-1, x1.shape[-1])
 
-        x2, batch2, coord2 = self.obj_feat_module(gt_objects)
-        if pred_objects is not None:
-            x3, batch3, coord3 = self.obj_feat_module(pred_objects)
-            num_preds = x3.shape[0]
-            
-            x2 = torch.cat([x2, x3], dim=0)
-            batch2 = torch.cat([batch2, batch3], dim=0)
-            coord2 = torch.cat([coord2, coord3], dim=0)
-        else:
-            num_preds = 0
+        x2, batch2, coord2 = self.obj_feat_module(objects)
         
         with torch.no_grad():
             e1, e2 = torch.meshgrid(
@@ -152,7 +145,6 @@ class ComposerBackbone(nn.Module):
         x1_out = x1_out.reshape(*x1_shape[:3], -1)
         x1_out = x1_out.transpose(1, 3)
 
-        x2_out = x_out[x1.shape[0]:(x.shape[0]-num_preds)]
-        x3_out = x_out[(x.shape[0]-num_preds):]
+        x2_out = x_out[x1.shape[0]:]
 
-        return x1_out, x2_out, x3_out
+        return x1_out, x2_out

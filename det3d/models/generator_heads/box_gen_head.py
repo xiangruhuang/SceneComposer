@@ -316,16 +316,18 @@ class BoxGenHead(nn.Module):
             batch_reg = preds_dict['reg']
             batch_hei = preds_dict['height']
 
-            batch_rot = torch.atan2(batch_rots, batch_rotc)
+            #batch_rot = torch.atan2(batch_rots, batch_rotc)
 
             batch, H, W, num_cls = batch_hm.size()
 
             batch_reg = batch_reg.reshape(batch, H*W, 2)
             batch_hei = batch_hei.reshape(batch, H*W, 1)
 
-            batch_rot = batch_rot.reshape(batch, H*W, 1)
+            #batch_rot = batch_rot.reshape(batch, H*W, 1)
             batch_dim = batch_dim.reshape(batch, H*W, 3)
             batch_hm = batch_hm.reshape(batch, H*W, num_cls)
+            batch_rots = batch_rots.reshape(batch, H*W, 1)
+            batch_rotc = batch_rotc.reshape(batch, H*W, 1)
 
             ys, xs = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)])
             ys = ys.view(1, H, W).repeat(batch, 1, 1).to(batch_hm)
@@ -337,7 +339,7 @@ class BoxGenHead(nn.Module):
             xs = xs * test_cfg.out_size_factor * test_cfg.voxel_size[0] + test_cfg.pc_range[0]
             ys = ys * test_cfg.out_size_factor * test_cfg.voxel_size[1] + test_cfg.pc_range[1]
 
-            batch_box_preds = torch.cat([xs, ys, batch_hei, batch_dim, batch_rot], dim=2)
+            batch_box_preds = torch.cat([xs, ys, batch_hei, batch_dim, batch_rots, batch_rotc], dim=2)
 
             scores, labels = batch_hm.max(dim=-1)
 

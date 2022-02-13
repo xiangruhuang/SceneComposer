@@ -21,35 +21,30 @@ class Discriminator(nn.Module):
         else:
             self.point_head = None
         self.box_head = builder.build_head(heads['box'])
-        self.crit = nn.MSELoss()
 
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
-    def forward(self, data, test_cfg):
-
-        gt_objects = data['objects']
-        pred_objects = data['pred_objects']
+    def forward(self, data, objects, test_cfg):
         
-        voxel_feat, gt_obj_feat, pred_obj_feat = self.backbone(
-                                                     data,
-                                                     gt_objects,
-                                                     pred_objects,
-                                                     test_cfg
-                                                 )
+        voxel_feat, obj_feat = self.backbone(
+                                   data,
+                                   objects,
+                                   test_cfg
+                               )
 
-        preds_on_gt = self.box_head(gt_obj_feat).squeeze(-1)
-        preds_on_fake = self.box_head(pred_obj_feat).squeeze(-1)
+        return self.box_head(obj_feat).squeeze(-1)
 
-        return torch.cat([preds_on_gt, preds_on_fake], dim=0)
+    def loss(self, preds, gt):
 
-    def loss(self, preds, data):
-        
-        gt_objects = data['objects']
-        pred_objects = data['pred_objects']
-        gt = torch.cat([gt_objects['gt'], pred_objects['gt']], dim=0)
-        
-        return self.crit(preds, gt)
+        gt = gt.long()
+        loss = -(preds[gt == 1].log().mean() + (1-preds[gt == 0]).log().mean())
+        acc = (preds.round().long() == gt).float().mean()
+
+        return dict(
+            loss=loss,
+            dsc_acc=[acc],
+        )
 
 class Generator(nn.Module):
     def __init__(
@@ -72,15 +67,13 @@ class Generator(nn.Module):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         
-    def forward(self, data, test_cfg, **kwargs):
+    def forward(self, data, gt_objects, test_cfg, **kwargs):
         
-        gt_objects = data['objects']
-        voxel_feat, gt_obj_feat, _ = self.backbone(
-                                         data,
-                                         gt_objects,
-                                         None,
-                                         test_cfg
-                                     )
+        voxel_feat, obj_feat = self.backbone(
+                                   data,
+                                   gt_objects,
+                                   test_cfg
+                               )
 
         preds_dicts, _ = self.box_head(voxel_feat)
 
@@ -101,6 +94,15 @@ class Generator(nn.Module):
             assert False, "Not Implemented Yet"
 
         return obj_preds
+
+    def loss(self, scores):
+
+        acc = scores.round().mean()
+
+        return dict(
+            loss=(1 - scores).log().mean(),
+            gen_acc=[acc],
+        )
 
 @COMPOSERS.register_module
 class Composer(nn.Module):
@@ -136,11 +138,25 @@ class Composer(nn.Module):
             print("no pretrained model at {}".format(pretrained))
 
     def forward(self, data, return_loss=True, **kwargs):
-        pred_objects = self.generator(data, self.test_cfg, **kwargs)
+        gt_objects = data.pop('objects')
 
-        data['pred_objects'] = pred_objects
+        pred_objects = self.generator(data, gt_objects, self.test_cfg, **kwargs)
 
-        preds = self.discriminator(data, self.test_cfg, **kwargs)
-        loss = self.discriminator.loss(preds, data)
+        all_objects = {}
+        for attr in ['boxes', 'coord', 'labels', 'gt']:
+            all_objects[attr] = torch.cat([gt_objects[attr], pred_objects[attr]], dim=0)
+        all_objects['points'] = None
+        all_objects['batch'] = None
 
-        return dict(loss=[loss])
+        preds = self.discriminator(data, all_objects, self.test_cfg, **kwargs)
+        
+        preds_on_fake = preds[all_objects['gt'].long()==1]
+
+        loss_gen = self.generator.loss(preds_on_fake)
+        loss_dsc = self.discriminator.loss(preds, all_objects['gt'])
+
+        rets = dict(loss=[loss_gen.pop('loss')+loss_dsc.pop('loss')])
+        rets.update(loss_gen)
+        rets.update(loss_dsc)
+
+        return rets
