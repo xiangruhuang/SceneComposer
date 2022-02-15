@@ -168,14 +168,19 @@ train_pipeline = [
 test_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
-    dict(type="Preprocess", cfg=val_preprocessor),
+    dict(type="Preprocess", cfg=train_preprocessor),
+    augmentations.affine_aug(),
+    dict(type="SeparateForeground",
+         cfg=dict(mode="train",
+                  class_names=class_names),
+        ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 
 train_anno = "data/Waymo/infos_train_50_01sweeps_filter_zero_gt.pkl"
-val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
+val_anno = "data/Waymo/infos_train_50_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
@@ -199,6 +204,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=test_pipeline,
+        load_interval=30,
     ),
     test=dict(
         type=dataset_type,
