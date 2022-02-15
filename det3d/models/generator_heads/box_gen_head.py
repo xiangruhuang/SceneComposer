@@ -309,7 +309,7 @@ class BoxGenHead(nn.Module):
 
             batch_hm = torch.sigmoid(preds_dict['hm'])
 
-            batch_dim = torch.exp(preds_dict['dim'].clip(-5, 5))
+            batch_dim = torch.exp(preds_dict['dim']*0.1)
 
             batch_rots = preds_dict['rot'][..., 0:1]
             batch_rotc = preds_dict['rot'][..., 1:2]
