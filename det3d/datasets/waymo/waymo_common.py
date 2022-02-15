@@ -14,7 +14,7 @@ import argparse
 from tqdm import tqdm
 try:
     import tensorflow as tf
-    tf.enable_eager_execution()
+    tf.compat.v1.enable_eager_execution()
 except:
     print("No Tensorflow")
 
