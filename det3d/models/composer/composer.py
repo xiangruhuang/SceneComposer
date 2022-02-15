@@ -150,26 +150,51 @@ class Composer(nn.Module):
         except:
             print("no pretrained model at {}".format(pretrained))
 
+    def generate_objects(self, metadatas, all_objects):
+        rets = []
+        for i, metadata in enumerate(metadatas):
+            batch = all_objects['coord'][:, -1].long()
+            mask = batch == i
+
+            boxes=all_objects['boxes'][mask]
+            labels=all_objects['labels'][mask]
+
+            gt = all_objects['gt'][mask]
+
+            ret = dict(
+                metadata=metadata,
+                boxes=boxes,
+                labels=labels,
+                gt=gt,
+            ) # TODO add point support 
+
+            rets.append(ret)
+
+        return rets
+
     def forward(self, data, return_loss=True, **kwargs):
         gt_objects = data.pop('objects')
 
         pred_objects = self.generator(data, gt_objects, self.test_cfg, **kwargs)
-
+        
         all_objects = {}
         for attr in ['boxes', 'coord', 'labels', 'gt']:
             all_objects[attr] = torch.cat([gt_objects[attr], pred_objects[attr]], dim=0)
         all_objects['points'] = None
         all_objects['batch'] = None
 
-        preds = self.discriminator(data, all_objects, self.test_cfg, **kwargs)
-        
-        preds_on_fake = preds[all_objects['gt'].long()==0]
+        if return_loss:
+            preds = self.discriminator(data, all_objects, self.test_cfg, **kwargs)
+            
+            preds_on_fake = preds[all_objects['gt'].long()==0]
 
-        loss_gen = self.generator.loss(preds_on_fake)
-        loss_dsc = self.discriminator.loss(preds, all_objects['gt'])
+            loss_gen = self.generator.loss(preds_on_fake)
+            loss_dsc = self.discriminator.loss(preds, all_objects['gt'])
 
-        rets = dict(loss=[loss_gen.pop('loss')+loss_dsc.pop('loss')])
-        rets.update(loss_gen)
-        rets.update(loss_dsc)
+            rets = dict(loss=[loss_gen.pop('loss')+loss_dsc.pop('loss')])
+            rets.update(loss_gen)
+            rets.update(loss_dsc)
 
-        return rets
+            return rets
+        else:
+            return self.generate_objects(data['metadata'], all_objects)

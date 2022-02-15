@@ -45,7 +45,7 @@ def example_to_device(example, device=None, non_blocking=False) -> dict:
             "cyv_num_points"
         ]:
             example_torch[k] = v.to(device, non_blocking=non_blocking)
-        elif k == "calib":
+        elif k in ["calib", "objects"]:
             calib = {}
             for k1, v1 in v.items():
                 # calib[k1] = torch.tensor(v1, dtype=dtype, device=device)
