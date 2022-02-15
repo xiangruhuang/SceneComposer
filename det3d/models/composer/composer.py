@@ -41,8 +41,14 @@ class Discriminator(nn.Module):
         gt = gt.long()
         loss = -(preds[gt == 1].log().mean() + (1-preds[gt == 0]).log().mean())
         acc = (preds.round().long() == gt).float()
-        acc0 = acc[gt == 0].mean()
-        acc1 = acc[gt == 1].mean()
+        if (gt == 0).any():
+            acc0 = acc[gt == 0].mean()
+        else:
+            acc0 = torch.tensor(0.0).float()
+        if (gt == 1).any():
+            acc1 = acc[gt == 1].mean()
+        else:
+            acc1 = torch.tensor(0.0).float()
         acc = acc.mean()
 
         return dict(

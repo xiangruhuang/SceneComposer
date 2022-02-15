@@ -82,8 +82,9 @@ class ObjectFeatureModule(nn.Module):
 
         boxes = objects['boxes']
         num_objects = boxes.shape[0]
-        labels = objects['labels']
+        labels = objects['labels'].long()
         labels_one_hot = F.one_hot(labels, self.num_classes)
+
         box_attr = torch.cat([boxes, labels_one_hot], dim=-1)
         obj_box_feature = self.box_mlp(box_attr)
 

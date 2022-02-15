@@ -141,7 +141,8 @@ def main():
     datasets = [build_dataset(cfg.data.train)]
 
     print('testing data loading pipeline')
-    print(datasets[0][0])
+    for i, data in enumerate(datasets[0]):
+        print(data)
 
 if __name__ == "__main__":
     main()
