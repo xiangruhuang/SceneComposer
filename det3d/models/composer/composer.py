@@ -25,7 +25,7 @@ class Discriminator(nn.Module):
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
 
-    def forward(self, data, objects, test_cfg):
+    def forward(self, data, objects, test_cfg, **kwargs):
         
         obj_feat = self.backbone(
                        data,
@@ -52,7 +52,7 @@ class Discriminator(nn.Module):
         acc = acc.mean()
 
         return dict(
-            loss=loss,
+            loss=[loss],
             dsc_overall=[acc],
             dsc_gt=[acc1],
             dsc_fake=[acc0],
@@ -114,7 +114,7 @@ class Generator(nn.Module):
         boxes = pred_objects['boxes'].mean(0)
 
         return dict(
-            loss=(1-scores).log().mean(),
+            loss=[(1-scores).log().mean()],
             gen_acc=[acc],
             gen_box=boxes,
         )
@@ -188,14 +188,18 @@ class Composer(nn.Module):
         if return_loss:
             preds = self.discriminator(data, all_objects, self.test_cfg, **kwargs)
             
+            mode = kwargs['name']
             preds_on_fake = preds[all_objects['gt'].long()==0]
-
             loss_gen = self.generator.loss(preds_on_fake, pred_objects)
             loss_dsc = self.discriminator.loss(preds, all_objects['gt'])
-
-            rets = dict(loss=[loss_gen.pop('loss')+loss_dsc.pop('loss')])
-            rets.update(loss_gen)
-            rets.update(loss_dsc)
+            if mode == 'dsc':
+                rets = loss_dsc
+                loss_gen.pop('loss')
+                rets.update(loss_gen)
+            else:
+                rets = loss_gen
+                loss_dsc.pop('loss')
+                rets.update(loss_dsc)
 
             return rets
         else:

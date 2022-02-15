@@ -5,7 +5,7 @@ from .iter_timer import IterTimerHook
 from .logger import LoggerHook, PaviLoggerHook, TensorboardLoggerHook, TextLoggerHook, ComposerTextLoggerHook
 from .lr_updater import LrUpdaterHook
 from .memory import EmptyCacheHook
-from .optimizer import OptimizerHook
+from .optimizer import OptimizerHook, GANOptimizerHook
 from .sampler_seed import DistSamplerSeedHook
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "ClosureHook",
     "LrUpdaterHook",
     "OptimizerHook",
+    "GANOptimizerHook",
     "IterTimerHook",
     "DistSamplerSeedHook",
     "EmptyCacheHook",

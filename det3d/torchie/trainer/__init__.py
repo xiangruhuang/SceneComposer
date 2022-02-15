@@ -21,6 +21,7 @@ from .log_buffer import LogBuffer
 from .parallel_test import parallel_test
 from .priority import Priority, get_priority
 from .trainer import Trainer
+from .composer_trainer import ComposerTrainer
 from .utils import (
     get_dist_info,
     get_host_info,
@@ -31,6 +32,7 @@ from .utils import (
 
 __all__ = [
     "Trainer",
+    "ComposerTrainer",
     "LogBuffer",
     "Hook",
     "CheckpointHook",

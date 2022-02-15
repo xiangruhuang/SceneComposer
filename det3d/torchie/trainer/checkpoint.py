@@ -211,6 +211,10 @@ def save_checkpoint(model, filename, optimizer=None, meta=None):
 
     checkpoint = {"meta": meta, "state_dict": weights_to_cpu(model.state_dict())}
     if optimizer is not None:
-        checkpoint["optimizer"] = optimizer.state_dict()
+        if isinstance(optimizer, dict):
+            for alter in optimizer.keys():
+                checkpoint[f'{alter}_optimizer'] = optimizer[alter].state_dict()
+        else:
+            checkpoint["optimizer"] = optimizer.state_dict()
 
     torch.save(checkpoint, filename)

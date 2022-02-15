@@ -143,7 +143,7 @@ def main():
     datasets = [build_dataset(cfg.data.train)]
 
     if len(cfg.workflow) == 2:
-        datasets.append(build_dataset(cfg.data.val))
+        datasets.append(build_dataset(cfg.data.train))
 
     if cfg.checkpoint_config is not None:
         # save det3d version, config file content and class names in

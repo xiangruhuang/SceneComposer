@@ -184,8 +184,8 @@ val_anno = "data/Waymo/infos_train_50_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=3,
-    workers_per_gpu=3,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -246,4 +246,4 @@ log_level = "INFO"
 work_dir = './work_dirs/{}/'.format(__file__[__file__.rfind('/') + 1:-3])
 load_from = None 
 resume_from = None  
-workflow = [('train', 1)]
+workflow = [('train_dsc', 1), ('train_gen', 1)]
