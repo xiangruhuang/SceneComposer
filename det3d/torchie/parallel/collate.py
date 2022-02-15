@@ -140,7 +140,6 @@ def collate_kitti(batch_list, samples_per_gpu=1):
             objects = {}
             offset = 0
             for i, elem in enumerate(elems):
-                print(i, elem)
                 scene_idx = torch.zeros(elem['boxes'].shape[0],
                                         dtype=torch.long) + i 
                 coord = np.concatenate(
