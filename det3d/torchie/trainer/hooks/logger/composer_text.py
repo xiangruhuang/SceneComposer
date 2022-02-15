@@ -76,7 +76,6 @@ class ComposerTextLoggerHook(LoggerHook):
                 if not loss_name.startswith(prefix):
                     continue
                 loss_name = loss_name[4:]
-                assert len(loss_value) == 1
 
                 if len(loss_value) == 1:
                     loss_value = self._convert_to_precision4(loss_value[0])

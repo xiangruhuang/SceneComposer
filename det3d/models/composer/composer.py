@@ -108,13 +108,15 @@ class Generator(nn.Module):
 
         return obj_preds
 
-    def loss(self, scores):
+    def loss(self, scores, pred_objects):
 
         acc = scores.round().mean()
+        boxes = pred_objects['boxes'].mean(0)
 
         return dict(
-            loss=(1 - scores).log().mean(),
+            loss=(1-scores).log().mean(),
             gen_acc=[acc],
+            gen_box=boxes,
         )
 
 @COMPOSERS.register_module
@@ -165,7 +167,7 @@ class Composer(nn.Module):
         
         preds_on_fake = preds[all_objects['gt'].long()==0]
 
-        loss_gen = self.generator.loss(preds_on_fake)
+        loss_gen = self.generator.loss(preds_on_fake, pred_objects)
         loss_dsc = self.discriminator.loss(preds, all_objects['gt'])
 
         rets = dict(loss=[loss_gen.pop('loss')+loss_dsc.pop('loss')])
