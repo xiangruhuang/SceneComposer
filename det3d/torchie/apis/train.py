@@ -14,10 +14,15 @@ import torch
 from det3d.builder import _create_learning_rate_scheduler
 
 # from det3d.datasets.kitti.eval_hooks import KittiDistEvalmAPHook, KittiEvalmAPHookV2
-from det3d.core import DistOptimizerHook
+from det3d.core import DistOptimizerHook, GANDistOptimizerHook
 from det3d.datasets import DATASETS, build_dataloader
 from det3d.solver.fastai_optim import OptimWrapper
-from det3d.torchie.trainer import DistSamplerSeedHook, Trainer, obj_from_dict
+from det3d.torchie.trainer import (
+    DistSamplerSeedHook,
+    Trainer,
+    obj_from_dict,
+    ComposerTrainer,
+)
 from det3d.utils.print_utils import metric_to_str
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel
@@ -345,14 +350,25 @@ def train_composer(model, dataset, cfg, distributed=False, validate=False, logge
         model = apex.parallel.convert_syncbn_model(model)
     if cfg.lr_config.type == "one_cycle":
         # build trainer
-        optimizer = build_one_cycle_optimizer(model, cfg.optimizer)
-        lr_scheduler = _create_learning_rate_scheduler(
-            optimizer, cfg.lr_config, total_steps
-        )
+        optimizer, lr_scheduler = {}, {}
+        for sub_model, name in zip(
+            [model.generator, model.discriminator], ['gen', 'dsc']
+        ):
+            optimizer[name] = build_one_cycle_optimizer(sub_model, cfg.optimizer)
+            lr_scheduler[name] = _create_learning_rate_scheduler(
+                optimizer[name], cfg.lr_config, total_steps
+            )
         cfg.lr_config = None
     else:
-        optimizer = build_optimizer(model, cfg.optimizer)
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=cfg.drop_step, gamma=.1)
+        optimizer, lr_scheduler = {}, {}
+        for sub_model, name in zip(
+            [model.generator, model.discriminator], ['gen', 'dsc']
+        ):
+            optimizer[name] = build_optimizer(sub_model, cfg.optimizer)
+            lr_scheduler[name] = torch.optim.lr_scheduler.MultiStepLR(
+                                     optimizer[name],
+                                     milestones=cfg.drop_step, gamma=.1
+                                 )
         # lr_scheduler = None
         cfg.lr_config = None 
 
@@ -370,12 +386,12 @@ def train_composer(model, dataset, cfg, distributed=False, validate=False, logge
 
     logger.info(f"model structure: {model}")
 
-    trainer = Trainer(
+    trainer = ComposerTrainer(
         model, batch_processor, optimizer, lr_scheduler, cfg.work_dir, cfg.log_level
     )
 
     if distributed:
-        optimizer_config = DistOptimizerHook(**cfg.optimizer_config)
+        optimizer_config = GANDistOptimizerHook(**cfg.optimizer_config)
     else:
         optimizer_config = cfg.optimizer_config
 

@@ -179,8 +179,8 @@ val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=3,
-    workers_per_gpu=3,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -189,7 +189,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
-        load_interval=10,
+        load_interval=63,
     ),
     val=dict(
         type=dataset_type,
@@ -235,11 +235,11 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 12
+total_epochs = 100
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"
 work_dir = './work_dirs/{}/'.format(__file__[__file__.rfind('/') + 1:-3])
 load_from = None 
 resume_from = None  
-workflow = [('train', 1)]
+workflow = [('train_dsc', 1), ('train_gen', 1)]
