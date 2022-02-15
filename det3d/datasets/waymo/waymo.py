@@ -52,7 +52,7 @@ class WaymoDataset(PointCloudDataset):
         with open(self._info_path, "rb") as f:
             _waymo_infos_all = pickle.load(f)
 
-        self._waymo_infos = _waymo_infos_all[self.load_interval:self.load_interval+2]
+        self._waymo_infos = _waymo_infos_all[::self.load_interval]
 
         print("Using {} Frames".format(len(self._waymo_infos)))
 
