@@ -87,6 +87,7 @@ class ObjectFeatureModule(nn.Module):
 
         box_attr = torch.cat([boxes, labels_one_hot], dim=-1)
         obj_box_feature = self.box_mlp(box_attr)
+        obj_box_feature = torch.cat([obj_box_feature, box_attr], dim=-1)
 
         if (objects['points'] is not None) and (self.point_gnn is not None):
             points = objects['points']

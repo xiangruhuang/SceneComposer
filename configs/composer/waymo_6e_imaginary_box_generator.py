@@ -2,7 +2,6 @@ import itertools
 import logging
 
 from det3d.utils.config_tool import get_downsample_factor
-from configs import augmentations
 
 tasks = [
     dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
@@ -15,102 +14,49 @@ target_assigner = dict(
     tasks=tasks,
 )
 
-composer_backbone = dict(
-    type='ComposerBackbone',
-    bg_feat_module=dict(
-        reader=dict(
-            type="VoxelFeatureExtractorV3",
-            num_input_features=5,
-        ),
-        backbone=dict(
-            type="SpMiddleResNetFHD",
-            num_input_features=5,
-            channels=[16, 32, 64, 128],
-            ds_factor=8
-        ),
-        neck=dict(
-            type="RPN",
-            layer_nums=[5, 5],
-            ds_layer_strides=[1, 2],
-            ds_num_filters=[128, 256],
-            us_layer_strides=[1, 2],
-            us_num_filters=[256, 256],
-            num_input_features=256,
-            logger=logging.getLogger("RPN"),
-        ),
-    ),
-    obj_feat_module=dict(
-        point_gnn=None,
-        #dict(
-        #    type='PointTransformer',
-        #    in_channels=2,
-        #    out_channels=448,
-        #    dim_model=[32, 64, 128, 256, 448],
-        #),
-        box_mlp=dict(
-            channels=[8+3, 512-(8+3)],
-            num_classes=3,
-        ),
-    ),
-    feat_prop_module=dict(
-        type='PointTransformerSeg',
-        in_channels=512,
-        out_channels=512,
-        point_dim=2,
-        down_transf_layers=[2,3],
-        up_transf_layers=[2,3],
-        dim_model=[128,256,512],
-    ),
-)
-
-generator = dict(
-    backbone=composer_backbone,
-    heads=dict(
-        box=dict(
-            type="BoxGenHead",
-            in_channels=512,
-            tasks=tasks,
-            dataset='waymo',
-            weight=2,
-            code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-            common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
-        ),
-        point=None,
-    ),
-)
-
-discriminator = dict(
-    backbone=composer_backbone,
-    heads=dict(
-        box=dict(
-            type="ObjRegHead",
-            channels=[512, 256, 128, 1],
-            dataset='waymo',
-        ),
-        point=None,
-    ),
-)
-
 # model settings
 model = dict(
-    type="Composer",
-    generator=generator,
-    discriminator=discriminator,
+    type="VoxelNet",
+    pretrained=None,
+    reader=dict(
+        type="VoxelFeatureExtractorV3",
+        num_input_features=5,
+    ),
+    backbone=dict(
+        type="SpMiddleResNetFHD", num_input_features=5, ds_factor=8),
+    neck=dict(
+        type="RPN",
+        layer_nums=[5, 5],
+        ds_layer_strides=[1, 2],
+        ds_num_filters=[128, 256],
+        us_layer_strides=[1, 2],
+        us_num_filters=[256, 256],
+        num_input_features=256,
+        logger=logging.getLogger("RPN"),
+    ),
+    bbox_head=dict(
+        type="CenterHead",
+        in_channels=sum([256, 256]),
+        tasks=tasks,
+        dataset='waymo',
+        weight=2,
+        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
+    ),
 )
 
 assigner = dict(
     target_assigner=target_assigner,
-    out_size_factor=get_downsample_factor(composer_backbone['bg_feat_module']),
+    out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
     max_objs=500,
     min_radius=2,
 )
 
-train_cfg = dict(
-    assigner=assigner,
-    class_names=class_names,
-)
+
+train_cfg = dict(assigner=assigner)
+
 
 test_cfg = dict(
     post_center_limit_range=[-80, -80, -10.0, 80, 80, 10.0],
@@ -122,11 +68,11 @@ test_cfg = dict(
         nms_iou_threshold=0.7,
     ),
     score_threshold=0.1,
-    max_num_objs=25,
     pc_range=[-75.2, -75.2],
-    out_size_factor=get_downsample_factor(composer_backbone['bg_feat_module']),
+    out_size_factor=get_downsample_factor(model),
     voxel_size=[0.1, 0.1],
 )
+
 
 # dataset settings
 dataset_type = "WaymoDataset"
@@ -136,11 +82,14 @@ data_root = "data/Waymo"
 train_preprocessor = dict(
     mode="train",
     shuffle_points=True,
+    global_rot_noise=[-0.78539816, 0.78539816],
+    global_scale_noise=[0.95, 1.05],
+    db_sampler=db_sampler,
     class_names=class_names,
 )
 
 val_preprocessor = dict(
-    mode="val",
+    mode="train",
     shuffle_points=False,
 )
 
@@ -155,7 +104,7 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    #augmentations.affine_aug(),
+    augmentations.affine_aug(),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
                   class_names=class_names),
@@ -168,18 +117,23 @@ test_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=val_preprocessor),
+    augmentations.affine_aug(),
+    dict(type="SeparateForeground",
+         cfg=dict(mode="train",
+                  class_names=class_names),
+        ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 
-train_anno = "data/Waymo/infos_train_50_01sweeps_filter_zero_gt.pkl"
+train_anno = "data/Waymo/infos_train_01sweeps_filter_zero_gt.pkl"
 val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=1,
+    samples_per_gpu=4,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -188,7 +142,6 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
-        load_interval=9919,
     ),
     val=dict(
         type=dataset_type,
@@ -226,19 +179,19 @@ lr_config = dict(
 checkpoint_config = dict(interval=1)
 # yapf:disable
 log_config = dict(
-    interval=1,
+    interval=5,
     hooks=[
-        dict(type="ComposerTextLoggerHook"),
+        dict(type="TextLoggerHook"),
         # dict(type='TensorboardLoggerHook')
     ],
 )
 # yapf:enable
 # runtime settings
-total_epochs = 1000
+total_epochs = 36
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"
 work_dir = './work_dirs/{}/'.format(__file__[__file__.rfind('/') + 1:-3])
 load_from = None 
 resume_from = None  
-workflow = [('train_dsc', 10), ('train_gen', 10)]
+workflow = [('train', 1)]

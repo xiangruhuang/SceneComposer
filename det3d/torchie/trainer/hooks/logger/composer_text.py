@@ -74,10 +74,18 @@ class ComposerTextLoggerHook(LoggerHook):
 
             for loss_name, loss_value in log_dict.items():
                 if not loss_name.startswith(prefix):
+                    if not loss_name == 'loss':
+                        continue
+                if (loss_name == 'loss') and (trainer.alter != prefix):
                     continue
-                loss_name = loss_name[4:]
+                if loss_name.startswith(prefix):
+                    loss_name = loss_name[4:]
 
-                if len(loss_value) == 1:
+                if isinstance(loss_value, float):
+                    loss_value = self._convert_to_precision4(loss_value)
+                elif isinstance(loss_value, int):
+                    loss_value = f'{loss_value}'
+                elif len(loss_value) == 1:
                     loss_value = self._convert_to_precision4(loss_value[0])
                 else:
                     loss_value = self._convert_to_precision4(loss_value)

@@ -28,6 +28,13 @@ def drop_arrays_by_name(gt_names, used_classes):
 
 @PIPELINES.register_module
 class SeparateForeground(object):
+    """Separate Foreground objects from background points.
+
+    Must operate with res['lidar']['annotations'] (i.e. bounding box 
+    annotations)
+    Remove any points that are in
+
+    """
     def __init__(self, cfg, **kwargs):
         self.mode = cfg.mode
         self.class_names = cfg['class_names']
