@@ -2,6 +2,7 @@ import itertools
 import logging
 
 from det3d.utils.config_tool import get_downsample_factor
+from configs import augmentations
 
 tasks = [
     dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
@@ -43,6 +44,7 @@ model = dict(
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
+    visualize=True,
 )
 
 assigner = dict(
@@ -84,7 +86,7 @@ train_preprocessor = dict(
     shuffle_points=True,
     global_rot_noise=[-0.78539816, 0.78539816],
     global_scale_noise=[0.95, 1.05],
-    db_sampler=db_sampler,
+    db_sampler=None,
     class_names=class_names,
 )
 
@@ -187,7 +189,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 36
+total_epochs = 6
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

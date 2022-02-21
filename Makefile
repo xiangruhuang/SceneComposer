@@ -1,6 +1,7 @@
 config=
 devices=0,1,2,3,4,5,6,7
-run:
+
+detector:
 	$(eval dirname := $(basename $(shell basename $(config))))
 	$(eval num_gpus := $(shell python -c "str='$(devices)'; print(len(str.split(',')))"))
 	OMP_NUM_THREADS=60 CUDA_VISIBLE_DEVICES=$(devices) python -m torch.distributed.launch --nproc_per_node=$(num_gpus) tools/train.py $(config) --work_dir work_dirs/$(dirname)/
