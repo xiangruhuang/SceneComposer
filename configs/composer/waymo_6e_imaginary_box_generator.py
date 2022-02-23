@@ -44,7 +44,7 @@ model = dict(
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=True,
+    visualize=False,
 )
 
 assigner = dict(
@@ -69,7 +69,7 @@ test_cfg = dict(
         nms_post_max_size=500,
         nms_iou_threshold=0.7,
     ),
-    score_threshold=0.1,
+    score_threshold=0.4,
     pc_range=[-75.2, -75.2],
     out_size_factor=get_downsample_factor(model),
     voxel_size=[0.1, 0.1],
@@ -93,6 +93,7 @@ train_preprocessor = dict(
 val_preprocessor = dict(
     mode="train",
     shuffle_points=False,
+    class_names=class_names,
 )
 
 voxel_generator = dict(
@@ -119,7 +120,6 @@ test_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=val_preprocessor),
-    augmentations.affine_aug(),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
                   class_names=class_names),
