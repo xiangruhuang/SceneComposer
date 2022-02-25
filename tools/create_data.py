@@ -30,7 +30,7 @@ def waymo_data_prep(root_path, split, nsweeps=1):
             used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
             nsweeps=nsweeps
         )
-    
+
 
 if __name__ == "__main__":
     fire.Fire()

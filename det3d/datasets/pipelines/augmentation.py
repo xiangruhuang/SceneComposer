@@ -222,3 +222,24 @@ class AffineAug(object):
         res["lidar"]["points"] = points
 
         return res, info
+
+@PIPELINES.register_module
+class SceneAug(object):
+    def __init__(self, cfg, **kwargs):
+        nsweeps = cfg.get('nsweeps', 1)
+
+        self.nsweeps = nsweeps
+        
+    def __call__(self, res, info):
+        import ipdb; ipdb.set_trace()
+        if self.nsweeps == 1:
+            return res, info
+        with open(info['anno_path'], 'rb') as fin:
+            anno_dict = pickle.load(fin)
+
+        T = res['veh_to_global'].reshape(4, 4)
+
+        
+
+        return res, info
+

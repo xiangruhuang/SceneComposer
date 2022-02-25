@@ -11,6 +11,16 @@ def affine_aug():
 
     return aug_dict
 
+def scene_aug():
+
+    aug_dict = dict(
+        type="SceneAug",
+        cfg=dict(
+            nsweeps=10,
+        ),
+    )
+
+    return aug_dict
 
 def gt_aug(split='train', sample_groups=None):
     

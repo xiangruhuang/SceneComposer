@@ -261,6 +261,28 @@ def center_to_corner_box3d(centers, dims, angles=None, origin=(0.5, 0.5, 0.5), a
     corners += centers.reshape([-1, 1, 3])
     return corners
 
+def center_to_corner_box3d_ori3d(centers, dims, ori3d=None, origin=(0.5, 0.5, 0.5)):
+    """convert kitti locations, dimensions and angles to corners
+
+    Args:
+        centers (float array, shape=[N, 3]): locations in kitti label file.
+        dims (float array, shape=[N, 3]): dimensions in kitti label file.
+        angles (float array, shape=[N]): rotation_y in kitti label file.
+        origin (list or array or float): origin point relate to smallest point.
+            use [0.5, 1.0, 0.5] in camera and [0.5, 0.5, 0] in lidar.
+        axis (int): rotation axis. 1 for camera and 2 for lidar.
+    Returns:
+        [type]: [description]
+    """
+    # 'length' in kitti format is in x axis.
+    # yzx(hwl)(kitti label file)<->xyz(lhw)(camera)<->z(-x)(-y)(wlh)(lidar)
+    # center in kitti format is [0.5, 1.0, 0.5] in xyz.
+    corners = corners_nd(dims, origin=origin)
+    # corners: [N, 8, 3]
+    if ori3d is not None:
+        corners = corners @ ori3d.transpose(0, 2, 1)
+    corners += centers.reshape([-1, 1, 3])
+    return corners
 
 def center_to_corner_box2d(centers, dims, angles=None, origin=0.5):
     """convert kitti locations, dimensions and angles to corners.

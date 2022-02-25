@@ -26,5 +26,6 @@ __all__ = [
     "AffineAug",
     "GTAug",
     "ReplaceAug",
+    "SceneAug",
     "SeparateForeground",
 ]

@@ -73,8 +73,21 @@ def _gather_feat(feat, ind, mask=None):
     return feat
 
 def _transpose_and_gather_feat(feat, ind):
+    """
+    Args:
+        feat: B X C X H X W
+        ind: B X M
+    
+    Returns:
+        feat: B X M X C
+    """
+    # [B, H, W, C] <- [B, C, H, W].permute()
     feat = feat.permute(0, 2, 3, 1).contiguous()
+
+    # [B, H*W, C] <- [B, H, W, C].view(B, -1, C)
     feat = feat.view(feat.size(0), -1, feat.size(3))
+
+    # [B, M, C] <- gather([B, H*W, C], [B, M])
     feat = _gather_feat(feat, ind)
     return feat
 

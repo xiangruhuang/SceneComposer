@@ -98,12 +98,13 @@ class Visualizer:
                      name, corners.reshape(-1, 3),
                      edges.reshape(-1, 2), **kwargs
                  )
-        if labels is not None:
-            # R->Car, G->Ped, B->Cyc
-            colors = np.array([[1,0,0], [0,1,0], [0,0,1], [0,1,1], [1,0,1], [1,1,0]])
-            labels = np.repeat(labels[:, np.newaxis], 8, axis=-1).reshape(-1)
-            ps_box.add_color_quantity('class', colors[labels],
-                                      defined_on='nodes', enabled=True)
+        if kwargs.get('color', None) is None:
+            if labels is not None:
+                # R->Car, G->Ped, B->Cyc
+                colors = np.array([[1,0,0], [0,1,0], [0,0,1], [0,1,1], [1,0,1], [1,1,0]])
+                labels = np.repeat(labels[:, np.newaxis], 8, axis=-1).reshape(-1)
+                ps_box.add_color_quantity('class', colors[labels],
+                                          defined_on='nodes', enabled=True)
         return ps_box
 
     def heatmap(self, name, heatmap, color=True, threshold=0.1, radius=2e-4,
