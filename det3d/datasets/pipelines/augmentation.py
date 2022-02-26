@@ -1,5 +1,6 @@
 import numpy as np
 import pickle
+import glob, os
 
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import (
@@ -12,6 +13,7 @@ from det3d.core.input.voxel_generator import VoxelGenerator
 from det3d.core.utils.center_utils import (
     draw_umich_gaussian, gaussian_radius
 )
+from det3d.structures import Sequence, get_sequence_id, get_frame_id
 from ..registry import PIPELINES
 
 def _dict_select(dict_, inds):
@@ -225,21 +227,61 @@ class AffineAug(object):
 
 @PIPELINES.register_module
 class SceneAug(object):
-    def __init__(self, cfg, **kwargs):
+    def __init__(self, split, cfg, **kwargs):
         nsweeps = cfg.get('nsweeps', 1)
+        root_path = cfg.root_path
+        ANNO_PATH = os.path.join(
+                        root_path,
+                        split,
+                        'annos',
+                        'seq_*_frame_0.pkl'
+                    )
+        seq_paths = glob.glob(ANNO_PATH)
+        seq_ids = list(map(get_sequence_id, seq_paths))
+
+        seq_ = {}
+        for seq_id in seq_ids:
+            seq = Sequence.from_index(
+                      seq_id,
+                      root_path,
+                      split,
+                      no_points=True
+                  )
+            seq_[seq_id] = seq
+        
+        self.seq_ = seq_
+        self.class_names = cfg.class_names
 
         self.nsweeps = nsweeps
         
     def __call__(self, res, info):
-        import ipdb; ipdb.set_trace()
         if self.nsweeps == 1:
             return res, info
-        with open(info['anno_path'], 'rb') as fin:
-            anno_dict = pickle.load(fin)
-
-        T = res['veh_to_global'].reshape(4, 4)
-
         
+        seq_id = get_sequence_id(info['anno_path'])
+        frame_id = get_frame_id(info['anno_path'])
+        
+        seq = self.seq_[seq_id]
+
+        seq.toframe(frame_id)
+
+        start_frame_id = max(frame_id-self.nsweeps+1, 0)
+        end_frame_id = min(frame_id+self.nsweeps-1, len(seq.frames)-1)
+        seq.set_scope(start_frame_id, end_frame_id)
+
+        boxes = seq.boxes_with_velo
+        uids = seq.uids
+        classes = seq.classes
+        names = np.array([self.class_names[cls] for cls in classes]).astype(str)
+        classes = classes + 1
+        
+        info['gt_names'] = names
+        info['gt_boxes'] = boxes
+        info['unique_ids'] = uids
+
+        res["lidar"]["annotations"]["gt_boxes"] = boxes 
+        res["lidar"]["annotations"]["gt_names"] = names
+        res["lidar"]["annotations"]["gt_classes"] = classes
 
         return res, info
 

@@ -271,7 +271,6 @@ class CenterHead(nn.Module):
             ret = {}
  
             # Regression loss for dimension, offset, height, rotation            
-            import ipdb; ipdb.set_trace()
             box_loss = self.crit_reg(preds_dict['anno_box'], example['mask'][task_id], example['ind'][task_id], target_box)
 
             loc_loss = (box_loss*box_loss.new_tensor(self.code_weights)).sum()

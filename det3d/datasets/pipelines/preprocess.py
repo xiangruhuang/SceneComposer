@@ -76,7 +76,9 @@ class SeparateForeground(object):
             
             for b in range(gt_boxes.shape[0]):
                 mask = indices[:, b]
-                assert mask.any(), "empty box"
+                if not mask.any():
+                    obj_count += 1
+                    continue
                 points_b = points[mask]
                 obj_points.append(points_b)
                 batch_b = np.zeros(points_b.shape[0], dtype=np.int32)+obj_count

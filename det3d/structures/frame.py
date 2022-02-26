@@ -189,6 +189,16 @@ class Frame:
                     self.ori2d[:, np.newaxis]],
                    axis=-1,
                )
+    
+    @property
+    def boxes_with_velo(self):
+        return np.concatenate(
+                   [self.box_centers,
+                    self.box_dims,
+                    np.zeros((self.box_dims.shape[0], 2)),
+                    self.ori2d[:, np.newaxis]],
+                   axis=-1,
+               )
 
     def toglobal(self):
         T = self.T @ np.linalg.inv(self.pose)

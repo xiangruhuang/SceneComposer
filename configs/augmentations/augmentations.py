@@ -11,12 +11,15 @@ def affine_aug():
 
     return aug_dict
 
-def scene_aug():
+def scene_aug(nsweeps=10, split='train', root_path='data/Waymo'):
 
     aug_dict = dict(
         type="SceneAug",
+        split=split,
         cfg=dict(
-            nsweeps=10,
+            root_path=root_path,
+            nsweeps=nsweeps,
+            class_names=['VEHICLE', 'PEDESTRIAN'],
         ),
     )
 

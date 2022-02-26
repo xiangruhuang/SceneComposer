@@ -18,6 +18,7 @@ class Sequence:
         self.frames = frames
         self.dtype = dtype
         self.seq_id = seq_id
+        self.set_scope()
 
     @classmethod
     def from_info(
@@ -82,6 +83,10 @@ class Sequence:
             frames.append(frame)
 
         return cls(seq_id, frames, dtype)
+
+    def set_scope(self, start_frame=0, end_frame=-1):
+        self.start_frame = start_frame
+        self.end_frame = end_frame
    
     def toglobal(self):
         for frame in self.frames:
@@ -113,14 +118,6 @@ class Sequence:
         for frame in self.frames:
             frame.transform(T)
 
-    def camera_trajectory(self, start_frame=0, end_frame=-1):
-        traj = []
-        if end_frame == -1:
-            end_frame = len(self.frames)
-        for frame in self.frames[start_frame:end_frame]:
-            traj.append(frame.camera_loc)
-        return traj
-
     def _gather(
         self,
         key,
@@ -144,153 +141,7 @@ class Sequence:
             return vals
         else:
             return np.concatenate(vals, axis=0)
-
-    @property
-    def points(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'points',
-                   start_frame,
-                   end_frame,
-                   attach_frame_id=True,
-                   return_list=True,
-               )
     
-    @property
-    def ori3d(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'ori3d',
-                   start_frame,
-                   end_frame,
-               )
-
-    @property
-    def points4d(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'points',
-                   start_frame,
-                   end_frame,
-                   attach_frame_id=True,
-               )
-
-    @property
-    def normals(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'normals',
-                   start_frame,
-                   end_frame,
-               )
-
-    @property
-    def boxes(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'boxes',
-                   start_frame,
-                   end_frame,
-               )
-    
-    @property
-    def corners(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'corners',
-                   start_frame,
-                   end_frame,
-               )
-
-    @property
-    def velocity(self, start_frame=0, end_frame=-1):
-        velocity = []
-        if end_frame == -1:
-            end_frame = len(self.frames)
-        for f in self.frames[start_frame:end_frame]:
-            velocity.append(f.velocity/f.vweight)
-        velocity = np.concatenate(velocity, axis=0)
-        return velocity
-    
-    @property
-    def classes(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'classes',
-                   start_frame,
-                   end_frame,
-               )
-    
-    @property
-    def origin_classes(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'origin_classes',
-                   start_frame,
-                   end_frame,
-               )
-
-    @property
-    def uids(self, start_frame=0, end_frame=-1):
-        return self._gather(
-                   'uids',
-                   start_frame,
-                   end_frame,
-               )
-
-    @property
-    def box_centers_4d(self, start_frame=0, end_frame=-1):
-        box_centers = []
-        if end_frame == -1:
-            end_frame = len(self.frames)
-        for f in self.frames[start_frame:end_frame]:
-            center_f = f.corners.mean(1)
-            frame_id = np.ones((center_f.shape[0], 1)) * f.frame_id
-            center_f = np.concatenate([center_f, frame_id], axis=-1)
-            box_centers.append(center_f)
-            
-        box_centers = np.concatenate(box_centers, axis=0)
-        return box_centers
-
-    @property
-    def object_traces(self):
-        object_pool = {}
-        for fid, f in enumerate(self.frames):
-            for tid, uid in enumerate(f.uids):
-                obj_box = (f.frame_id,
-                           f.boxes[tid],
-                           f.corners[tid],
-                           f.origin_classes[tid],
-                           f.global_speed[tid],
-                           f.global_accel[tid],
-                           uid)
-                trace = object_pool.get(uid, [])
-                trace.append(obj_box)
-                object_pool[uid] = trace
-
-        object_traces = []
-        for uid, trace in object_pool.items():
-            frame_ids, boxes, corners, classes, global_speed, global_accel, \
-                uids = [[] for i in range(7)]
-            for t in trace:
-                frame_ids.append(t[0])
-                boxes.append(t[1])
-                corners.append(t[2])
-                classes.append(t[3])
-                global_speed.append(t[4])
-                global_accel.append(t[5])
-                uids.append(t[6])
-            frame_ids = np.array(frame_ids)
-            boxes = np.stack(boxes, axis=0)
-            corners = np.stack(corners, axis=0)
-            classes = np.array(classes)
-            uids = np.array(uids).astype(str)
-            global_speed = np.stack(global_speed, axis=0)
-            global_accel = np.stack(global_accel, axis=0)
-            trace_dict = dict(
-                frame_ids=frame_ids,
-                boxes=boxes,
-                corners=corners,
-                classes=classes,
-                global_speed=global_speed,
-                global_accel=global_accel,
-                uids=uids)
-            object_traces.append(trace_dict)
-
-        return object_traces
-
     def filter_points(self, mask):
         offset = 0
         for i, f in enumerate(self.frames):
@@ -401,3 +252,166 @@ class Sequence:
             moving_uids.append(uid)
         
         return self.points_not_in_box(moving_uids)
+    
+    @property
+    def camera_trajectory(self):
+        return self._gather(
+                   'camera_loc',
+                   self.start_frame,
+                   self.end_frame,
+                   return_list=True,
+               )
+
+    @property
+    def points(self):
+        return self._gather(
+                   'points',
+                   self.start_frame,
+                   self.end_frame,
+                   attach_frame_id=True,
+                   return_list=True,
+               )
+    
+    @property
+    def ori3d(self):
+        return self._gather(
+                   'ori3d',
+                   self.start_frame,
+                   self.end_frame,
+               )
+
+    @property
+    def points4d(self):
+        return self._gather(
+                   'points',
+                   self.start_frame,
+                   self.end_frame,
+                   attach_frame_id=True,
+               )
+
+    @property
+    def normals(self):
+        return self._gather(
+                   'normals',
+                   self.start_frame,
+                   self.end_frame,
+               )
+
+    @property
+    def boxes(self):
+        return self._gather(
+                   'boxes',
+                   self.start_frame,
+                   self.end_frame,
+               )
+    
+    @property
+    def boxes_with_velo(self):
+        return self._gather(
+                   'boxes_with_velo',
+                   self.start_frame,
+                   self.end_frame,
+               )
+    
+    @property
+    def corners(self):
+        return self._gather(
+                   'corners',
+                   self.start_frame,
+                   self.end_frame,
+               )
+
+    @property
+    def velocity(self):
+        start_frame, end_frame = self.start_frame, self.end_frame
+        velocity = []
+        if end_frame == -1:
+            end_frame = len(self.frames)
+        for f in self.frames[start_frame:end_frame]:
+            velocity.append(f.velocity/f.vweight)
+        velocity = np.concatenate(velocity, axis=0)
+        return velocity
+    
+    @property
+    def classes(self):
+        return self._gather(
+                   'classes',
+                   self.start_frame,
+                   self.end_frame,
+               )
+    
+    @property
+    def origin_classes(self):
+        return self._gather(
+                   'origin_classes',
+                   self.start_frame,
+                   self.end_frame,
+               )
+
+    @property
+    def uids(self):
+        return self._gather(
+                   'uids',
+                   self.start_frame,
+                   self.end_frame,
+               )
+
+    @property
+    def box_centers_4d(self):
+        return self._gather(
+                   'box_centers',
+                   self.start_frame,
+                   self.end_frame,
+                   attach_frame_id=True,
+               )
+
+    @property
+    def object_traces(self):
+        start_frame, end_frame = self.start_frame, self.end_frame
+        if end_frame == -1:
+            end_frame = len(self.frames)
+        object_pool = {}
+        for fid, f in enumerate(self.frames[start_frame:end_frame]):
+            for tid, uid in enumerate(f.uids):
+                obj_box = (f.frame_id,
+                           f.boxes[tid],
+                           f.corners[tid],
+                           f.origin_classes[tid],
+                           f.global_speed[tid],
+                           f.global_accel[tid],
+                           uid)
+                trace = object_pool.get(uid, [])
+                trace.append(obj_box)
+                object_pool[uid] = trace
+
+        object_traces = []
+        for uid, trace in object_pool.items():
+            frame_ids, boxes, corners, classes, global_speed, global_accel, \
+                uids = [[] for i in range(7)]
+            for t in trace:
+                frame_ids.append(t[0])
+                boxes.append(t[1])
+                corners.append(t[2])
+                classes.append(t[3])
+                global_speed.append(t[4])
+                global_accel.append(t[5])
+                uids.append(t[6])
+            frame_ids = np.array(frame_ids)
+            boxes = np.stack(boxes, axis=0)
+            corners = np.stack(corners, axis=0)
+            classes = np.array(classes)
+            uids = np.array(uids).astype(str)
+            global_speed = np.stack(global_speed, axis=0)
+            global_accel = np.stack(global_accel, axis=0)
+            trace_dict = dict(
+                frame_ids=frame_ids,
+                boxes=boxes,
+                corners=corners,
+                classes=classes,
+                global_speed=global_speed,
+                global_accel=global_accel,
+                uids=uids)
+            object_traces.append(trace_dict)
+
+        return object_traces
+

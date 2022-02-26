@@ -142,6 +142,7 @@ def main():
 
     print('testing data loading pipeline')
     for i, data in enumerate(datasets[0]):
+        import ipdb; ipdb.set_trace()
         print(data)
 
 if __name__ == "__main__":

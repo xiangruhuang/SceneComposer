@@ -5,7 +5,7 @@ from det3d.utils.config_tool import get_downsample_factor
 from configs import augmentations
 
 tasks = [
-    dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
+    dict(num_class=2, class_names=['VEHICLE', 'PEDESTRIAN']),
 ]
 
 class_names = list(itertools.chain(*[t["class_names"] for t in tasks]))
@@ -44,7 +44,7 @@ model = dict(
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=False,
+    visualize=True,
 )
 
 assigner = dict(
@@ -52,7 +52,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=500,
+    max_objs=10000,
     min_radius=2,
 )
 
@@ -107,7 +107,9 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    augmentations.scene_aug(),
+    augmentations.scene_aug(
+        nsweeps=30, split='train_50'
+    ),
     augmentations.affine_aug(),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
