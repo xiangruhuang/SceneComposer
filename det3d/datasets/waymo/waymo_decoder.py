@@ -18,6 +18,8 @@ from waymo_open_dataset import dataset_pb2
 from waymo_open_dataset.utils import range_image_utils
 from waymo_open_dataset.utils import transform_utils
 tf.enable_v2_behavior()
+  
+TYPE_LIST = ['UNKNOWN', 'VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST']
 
 def decode_frame(frame, frame_id):
   """Decodes native waymo Frame proto to tf.Examples."""
@@ -164,6 +166,7 @@ def global_vel_to_ref(vel, global_from_ref_rotation):
 def extract_objects(laser_labels, global_from_ref_rotation):
   """Extract objects."""
   objects = []
+
   for object_id, label in enumerate(laser_labels):
     category_label = label.type
     box = label.box
@@ -190,6 +193,7 @@ def extract_objects(laser_labels, global_from_ref_rotation):
         'id': object_id,
         'name': label.id,
         'label': category_label,
+        'class_name': TYPE_LIST[category_label],
         'box': np.array([box.center_x, box.center_y, box.center_z,
                          box.length, box.width, box.height, ref_velocity[0], 
                          ref_velocity[1], box.heading], dtype=np.float32),

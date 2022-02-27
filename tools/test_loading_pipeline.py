@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+import time
 
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning, NumbaWarning
 import warnings
@@ -141,9 +142,10 @@ def main():
     datasets = [build_dataset(cfg.data.train)]
 
     print('testing data loading pipeline')
-    for i, data in enumerate(datasets[0]):
-        import ipdb; ipdb.set_trace()
-        print(data)
+    for i in range(10):
+        start_time = time.time()
+        data = datasets[0][i]
+        print(f'time={time.time()-start_time}')
 
 if __name__ == "__main__":
     main()

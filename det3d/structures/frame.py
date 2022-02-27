@@ -24,17 +24,21 @@ class Frame:
         dtype=np.float64,
         no_points=False,
         compute_normal=False,
+        class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST'],
     ):
         self.path = path
         self.dtype = dtype
         self.frame_id = get_frame_id(path)
         self.compute_normal = compute_normal
-        self.load_annos()
+
+        self.load_annos(class_names)
+
         if not no_points:
             self.load_points()
         else:
             self.points = np.zeros((0, 3)).astype(dtype)
             self.normals = np.zeros((0, 3)).astype(dtype)
+
         self.pose = np.eye(4).astype(self.dtype)
         self.camera_loc = np.zeros(3).astype(self.dtype)
 
@@ -47,15 +51,19 @@ class Frame:
         split='train',
         dtype=np.float64,
         no_points=False,
+        class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST'],
     ):
-        path = f'data/Waymo/{split}/lidar/seq_{seq_id}_frame_{frame_id}.pkl'
-        LIDARPATH = os.path.join(
-                        root_path,
-                        split,
-                        'lidar',
-                        'seq_{}_frame_{}.pkl',
-                    )
-        return cls(path, dtype=dtype, no_points=no_points)
+        path = os.path.join(
+                   root_path,
+                   split,
+                   'lidar',
+                   f'seq_{seq_id}_frame_{frame_id}.pkl',
+               )
+        return cls(path,
+                   dtype=dtype,
+                   no_points=no_points,
+                   class_names=class_names
+               )
     
     def transform(self, T):
         self.pose = T @ self.pose
@@ -94,7 +102,7 @@ class Frame:
         else:
             self.normals = None
 
-    def load_annos(self):
+    def load_annos(self, class_names):
         anno_dict = get_pickle(self.path.replace('lidar', 'annos'))
 
         # wall clock time in second.
@@ -106,7 +114,9 @@ class Frame:
         # used as a unique scene name
         self.scene_name = anno_dict['scene_name']
 
-        objects = anno_dict['objects']
+        # ignore objects of no interest
+        objects = list(filter(lambda o: o['class_name'] in class_names,
+                              anno_dict['objects']))
         
         # unique object ids
         self.uids = np.array([o['name'] for o in objects]).astype(str)
@@ -116,13 +126,11 @@ class Frame:
                     [o['box'] for o in objects]
                 ).reshape(-1, 9).astype(self.dtype)
         
-        # ignored classes are marked as -1
-        label_map = {0:-1, 1:0, 2:1, 3:-1, 4:2}
-        self.classes = np.array([label_map[o['label']] for o in objects])
+        self.classes = np.array([class_names.index(o['class_name']) for o in objects])
             
         # remove boxes that are empty or of ignored classes
         num_points = np.array([o['num_points'] for o in objects])
-        mask = (num_points > 0) & (self.classes != -1)
+        mask = num_points > 0
         self.uids = self.uids[mask]
         boxes = boxes[mask]
         self.classes = self.classes[mask]
@@ -192,10 +200,14 @@ class Frame:
     
     @property
     def boxes_with_velo(self):
+        if hasattr(self, 'global_speed'):
+            global_speed = self.global_speed
+        else:
+            global_speed = np.zeros((np.box_centers.shape[0], 2))
         return np.concatenate(
                    [self.box_centers,
                     self.box_dims,
-                    np.zeros((self.box_dims.shape[0], 2)),
+                    global_speed,
                     self.ori2d[:, np.newaxis]],
                    axis=-1,
                )

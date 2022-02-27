@@ -19,90 +19,10 @@ def _dict_select(dict_, inds):
         else:
             dict_[k] = v[inds]
 
-
 def drop_arrays_by_name(gt_names, used_classes):
     inds = [i for i, x in enumerate(gt_names) if x not in used_classes]
     inds = np.array(inds, dtype=np.int64)
     return inds
-
-
-@PIPELINES.register_module
-class SeparateForeground(object):
-    """Separate Foreground objects from background points.
-
-    Must operate with res['lidar']['annotations'] (i.e. bounding box 
-    annotations)
-    Remove any points that are in
-
-    """
-    def __init__(self, cfg, **kwargs):
-        self.mode = cfg.mode
-        self.class_names = cfg['class_names']
-
-    def __call__(self, res, info):
-        
-        assert self.mode == "train"
-
-        points = res["lidar"]["points"]
-
-        objects = dict(
-            points=np.zeros((0, points.shape[1]), dtype=np.float32),
-            batch=np.zeros(0, dtype=np.int32),
-            boxes=np.zeros((0, 8), dtype=np.float32),
-            classes=np.zeros(0, dtype=np.int32),
-        )
-        
-        gt_dict = res["lidar"]["annotations"]
-        gt_boxes = gt_dict["gt_boxes"]
-        if gt_boxes.shape[0] > 0:
-            gt_names = gt_dict["gt_names"]
-            gt_classes = np.array([self.class_names.index(gt_name)
-                                   for gt_name in gt_names])
-            
-            # find points that are in the boxes
-            gt_corners = box_np_ops.center_to_corner_box3d(
-                             gt_boxes[:, :3],
-                             gt_boxes[:, 3:6],
-                             gt_boxes[:, -1],
-                             axis=2
-                         )
-            surfaces = box_np_ops.corner_to_surfaces_3d(gt_corners)
-            indices = points_in_convex_polygon_3d_jit(
-                          points[:, :3], surfaces
-                      )
-            
-            obj_points, batch = [], [] 
-            obj_count = 0
-            
-            for b in range(gt_boxes.shape[0]):
-                mask = indices[:, b]
-                if not mask.any():
-                    obj_count += 1
-                    continue
-                points_b = points[mask]
-                obj_points.append(points_b)
-                batch_b = np.zeros(points_b.shape[0], dtype=np.int32)+obj_count
-                batch.append(batch_b)
-                obj_count += 1
-            obj_points = np.concatenate(obj_points, axis=0)
-            batch = np.concatenate(batch, axis=0)
-
-            points = points[indices.any(-1) == False]
-            anno_boxes = np.concatenate([gt_boxes[:, :6],
-                                         np.sin(gt_boxes[:, -1:]),
-                                         np.cos(gt_boxes[:, -1:])],
-                                        axis=1)
-            objects = dict(
-                points=obj_points,
-                batch=batch,
-                boxes=anno_boxes,
-                classes=gt_classes,
-            )
-
-        res["lidar"]["objects"] = objects
-        res["lidar"]["points"] = points
-
-        return res, info
 
 
 @PIPELINES.register_module
@@ -448,6 +368,7 @@ class AssignLabel(object):
             boxes_and_cls = np.concatenate((boxes, 
                 classes.reshape(-1, 1).astype(np.float32)), axis=1)
             num_obj = len(boxes_and_cls)
+
             assert num_obj <= max_objs
             # x, y, z, w, l, h, rotation_y, velocity_x, velocity_y, class_name
             boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]

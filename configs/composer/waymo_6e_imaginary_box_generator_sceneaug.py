@@ -52,7 +52,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=500*110,
+    max_objs=1000,
     min_radius=2,
 )
 
@@ -108,11 +108,13 @@ train_pipeline = [
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
     augmentations.scene_aug(
-        nsweeps=50, split='train'
+        nsweeps=2, split='train'
     ),
     augmentations.affine_aug(),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
+                  return_objects=True,
+                  ignore_empty_boxes=True,
                   class_names=class_names),
         ),
     dict(type="Voxelization", cfg=voxel_generator),

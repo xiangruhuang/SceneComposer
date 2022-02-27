@@ -245,9 +245,12 @@ class SceneAug(object):
                       seq_id,
                       root_path,
                       split,
-                      no_points=True
+                      no_points=True,
+                      class_names=cfg.class_names,
                   )
             seq_[seq_id] = seq
+
+        self.compress_static = cfg.get("compress_static", True)
         
         self.seq_ = seq_
         self.class_names = cfg.class_names
@@ -266,14 +269,17 @@ class SceneAug(object):
         seq.toframe(frame_id)
 
         start_frame_id = max(frame_id-self.nsweeps+1, 0)
-        end_frame_id = min(frame_id+self.nsweeps-1, len(seq.frames)-1)
+        end_frame_id = min(frame_id+self.nsweeps, len(seq.frames))
         seq.set_scope(start_frame_id, end_frame_id)
 
         boxes = seq.boxes_with_velo
+            
         uids = seq.uids
         classes = seq.classes.astype(np.int64)
         names = np.array([self.class_names[cls] for cls in classes]).astype(str)
         classes = classes + 1
+        if self.compress_static:
+            import ipdb; ipdb.set_trace()
         
         info['gt_names'] = names
         info['gt_boxes'] = boxes

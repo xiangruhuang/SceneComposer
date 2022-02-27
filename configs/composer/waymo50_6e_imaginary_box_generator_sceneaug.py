@@ -5,7 +5,7 @@ from det3d.utils.config_tool import get_downsample_factor
 from configs import augmentations
 
 tasks = [
-    dict(num_class=2, class_names=['VEHICLE', 'PEDESTRIAN']),
+    dict(num_class=1, class_names=['VEHICLE']),
 ]
 
 class_names = list(itertools.chain(*[t["class_names"] for t in tasks]))
@@ -44,7 +44,7 @@ model = dict(
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=True,
+    visualize=False,
 )
 
 assigner = dict(
@@ -52,7 +52,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=10000,
+    max_objs=500*30,
     min_radius=2,
 )
 
@@ -107,14 +107,19 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    augmentations.scene_aug(
-        nsweeps=30, split='train_50'
+    dict(type="SceneAug",
+         split="train_50",
+         cfg=dict(root_path=data_root,
+                  nsweeps=30,
+                  class_names=class_names,
+                  compress_static=True),
     ),
     augmentations.affine_aug(),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
-                  class_names=class_names),
-        ),
+                  return_objects=False,
+                  ignore_empty_boxes=False),
+    ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
@@ -125,8 +130,9 @@ test_pipeline = [
     dict(type="Preprocess", cfg=val_preprocessor),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
-                  class_names=class_names),
-        ),
+                  return_objects=False,
+                  ignore_empty_boxes=False),
+    ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),

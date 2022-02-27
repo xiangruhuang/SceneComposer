@@ -26,6 +26,7 @@ class Sequence:
         info,
         dtype=np.float64,
         no_points=False,
+        class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST'],
         num_processes=8,
     ):
         """Load Sequence from info dict.
@@ -48,7 +49,8 @@ class Sequence:
 
         pool = multiprocessing.pool.ThreadPool(processes=8)
         frames = pool.map(
-                     lambda x : Frame(x, dtype, no_points),
+                     lambda x : Frame(x, dtype, no_points,
+                                      class_names=class_names),
                      frame_paths,
                      chunksize=100
                  )
@@ -63,6 +65,8 @@ class Sequence:
         split='train',
         dtype=np.float32,
         no_points=False,
+        class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST'],
+        num_processes=8,
     ):
         """Load sequence from sequence id.
         
@@ -77,10 +81,14 @@ class Sequence:
         frame_paths = glob.glob(LIDARPATH.format(seq_id, '*'))
         frame_paths = sorted(frame_paths, key=get_frame_id)
 
-        frames = []
-        for frame_path in frame_paths:
-            frame = Frame(frame_path, dtype, no_points)
-            frames.append(frame)
+        pool = multiprocessing.pool.ThreadPool(processes=8)
+        frames = pool.map(
+                     lambda x : Frame(x, dtype, no_points,
+                                      class_names=class_names),
+                     frame_paths,
+                     chunksize=100
+                 )
+        pool.close()
 
         return cls(seq_id, frames, dtype)
 

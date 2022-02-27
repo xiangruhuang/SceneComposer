@@ -4,12 +4,17 @@ from det3d.core import Visualizer
 from det3d.core.bbox import box_np_ops
 import numpy as np
 
+frame = Frame.from_index(0, 0)
+frame = Frame.from_index(1, 0)
+frame = Frame.from_index(2, 0)
+print(frame.boxes)
+
 seqs = []
 for seq_id in range(10):
     seq = Sequence.from_index(seq_id, split='train_50', dtype=np.float64, no_points=True)
     seqs.append(seq)
 
-seq = seqs[5]
+seq = seqs[1]
 seq.toframe(0)
 
 vis = Visualizer()
