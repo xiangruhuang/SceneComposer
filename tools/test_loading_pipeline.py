@@ -142,7 +142,7 @@ def main():
     datasets = [build_dataset(cfg.data.train)]
 
     print('testing data loading pipeline')
-    for i in range(10):
+    for i in range(0, 1000, 100):
         start_time = time.time()
         data = datasets[0][i]
         print(f'time={time.time()-start_time}')

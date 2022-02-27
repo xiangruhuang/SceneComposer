@@ -4,9 +4,7 @@ from det3d.core import Visualizer
 from det3d.core.bbox import box_np_ops
 import numpy as np
 
-frame = Frame.from_index(0, 0)
 frame = Frame.from_index(1, 0)
-frame = Frame.from_index(2, 0)
 print(frame.boxes)
 
 seqs = []

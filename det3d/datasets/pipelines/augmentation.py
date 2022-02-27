@@ -278,8 +278,29 @@ class SceneAug(object):
         classes = seq.classes.astype(np.int64)
         names = np.array([self.class_names[cls] for cls in classes]).astype(str)
         classes = classes + 1
+
         if self.compress_static:
-            import ipdb; ipdb.set_trace()
+            mask = np.ones(uids.shape[0], dtype=bool)
+            unique_ids = np.unique(uids)
+            velo = np.linalg.norm(boxes[:, 6:8], axis=-1, ord=2)
+            velo_dict = {u: velo[uids == u].mean() for u in unique_ids}
+
+            for u in unique_ids:
+                u_indices = np.where(uids == u)[0]
+                umask = np.ones(u_indices.shape[0], dtype=bool)
+                for i, idx in enumerate(u_indices):
+                    if not umask[i]:
+                        continue
+                    for j, idx2 in enumerate(u_indices[i+1:]):
+                        dist = np.linalg.norm(boxes[idx, :3] - boxes[idx2, :3], ord=2)
+                        if dist < 0.1:
+                            umask[j] = False
+                mask[u_indices] = umask
+                    
+            uids = uids[mask]
+            classes = classes[mask]
+            names = names[mask]
+            boxes = boxes[mask]
         
         info['gt_names'] = names
         info['gt_boxes'] = boxes
