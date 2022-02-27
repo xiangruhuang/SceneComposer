@@ -19,7 +19,7 @@ def scene_aug(nsweeps=10, split='train', root_path='data/Waymo'):
         cfg=dict(
             root_path=root_path,
             nsweeps=nsweeps,
-            class_names=['VEHICLE', 'PEDESTRIAN'],
+            class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST'],
         ),
     )
 

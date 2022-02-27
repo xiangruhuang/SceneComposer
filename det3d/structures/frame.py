@@ -74,9 +74,8 @@ class Frame:
         sint = (self.ori3d[:, 0, 1] - self.ori3d[:, 1, 0])/2.0
         self.ori2d = np.arctan2(sint, cost)
 
-        self.corners = (
-                self.corners.reshape(-1, 3) @ T[:3, :3].T + T[:3, 3]
-                ).reshape(-1, 8, 3)
+        self.corners = (self.corners.reshape(-1, 3) @ T[:3, :3].T \
+                        + T[:3, 3]).reshape(-1, 8, 3)
 
         self.camera_loc = T[:3, :3] @ self.camera_loc + T[:3, 3]
     
@@ -159,16 +158,17 @@ class Frame:
         _sint = (self.ori3d[:, 1, 0] - self.ori3d[:, 0, 1])/2.0
         self.ori2d = np.arctan2(_sint, _cost)
         
-        if objects[0].get('global_speed', None) is not None:
-            self.global_speed = np.array(
-                                    [o['global_speed'] for o in objects],
-                                    dtype=self.dtype
-                                ).reshape(-1, 2)[mask]
-        if objects[0].get('global_accel', None) is not None:
-            self.global_accel = np.array(
-                                    [o['global_accel'] for o in objects],
-                                    dtype=self.dtype
-                                ).reshape(-1, 2)[mask]
+        if self.num_objs != 0:
+            if objects[0].get('global_speed', None) is not None:
+                self.global_speed = np.array(
+                                        [o['global_speed'] for o in objects],
+                                        dtype=self.dtype
+                                    ).reshape(-1, 2)[mask]
+            if objects[0].get('global_accel', None) is not None:
+                self.global_accel = np.array(
+                                        [o['global_accel'] for o in objects],
+                                        dtype=self.dtype
+                                    ).reshape(-1, 2)[mask]
 
         # for visualization purpose, we also keep track of the box corners
         if boxes.shape[0] > 0:

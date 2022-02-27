@@ -271,7 +271,7 @@ class SceneAug(object):
 
         boxes = seq.boxes_with_velo
         uids = seq.uids
-        classes = seq.classes
+        classes = seq.classes.astype(np.int64)
         names = np.array([self.class_names[cls] for cls in classes]).astype(str)
         classes = classes + 1
         
