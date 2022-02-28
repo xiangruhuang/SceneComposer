@@ -369,6 +369,10 @@ class AssignLabel(object):
                 classes.reshape(-1, 1).astype(np.float32)), axis=1)
             num_obj = len(boxes_and_cls)
 
+            if num_obj > max_objs:
+                print(num_obj, max_objs)
+                print(info["lidar_path"])
+
             assert num_obj <= max_objs
             # x, y, z, w, l, h, rotation_y, velocity_x, velocity_y, class_name
             boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]

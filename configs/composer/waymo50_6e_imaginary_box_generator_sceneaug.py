@@ -52,7 +52,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=500*30,
+    max_objs=500*5,
     min_radius=2,
 )
 
