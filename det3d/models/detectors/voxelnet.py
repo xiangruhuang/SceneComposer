@@ -18,11 +18,13 @@ class VoxelNet(SingleStageDetector):
         test_cfg=None,
         pretrained=None,
         visualize=False,
+        render=False
     ):
         super(VoxelNet, self).__init__(
             reader, backbone, neck, bbox_head, train_cfg, test_cfg, pretrained
         )
         self.visualize = visualize
+        self.render = render
         
     def extract_feat(self, data):
         if 'voxels' not in data:
@@ -57,7 +59,11 @@ class VoxelNet(SingleStageDetector):
         return x, voxel_feature
 
     def render_examples(self, example):
-        vis = Visualizer()
+        vis = Visualizer(
+                  self.test_cfg.voxel_size,
+                  self.test_cfg.pc_range,
+                  self.test_cfg.out_size_factor
+              )
         for i, points in enumerate(example['points']):
             points = points.detach().cpu()
             vis.clear()
@@ -84,13 +90,18 @@ class VoxelNet(SingleStageDetector):
             #        center_[0] += dims[0]*2*dx
             #        center_[1] += dims[1]*2*dy
             vis.look_at(center)
-            vis.screenshot(f'figures/seq_{seq_id:03d}_frame_{frame_id:03d}.png')
+            vis.heatmap('hm', example['hm'][0][i, 0].detach().cpu())
+            if self.visualize:
+                vis.show()
+                import ipdb; ipdb.set_trace()
+            if self.render:
+                vis.screenshot(f'figures/seq_{seq_id:03d}_frame_{frame_id:03d}.png')
 
 
     def forward(self, example, return_loss=True, **kwargs):
         x, _ = self.extract_feat(example)
 
-        if self.visualize:
+        if self.render or self.visualize:
             self.render_examples(example)
 
         preds, _ = self.bbox_head(x)

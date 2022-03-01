@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import points_in_convex_polygon_3d_jit
@@ -15,6 +16,76 @@ def remove_empty_boxes(indices, attr_dict):
     indices = indices[:, not_empty_box]
 
     return indices, new_attr_dict
+
+@PIPELINES.register_module
+class ComputeVisibility(object):
+    """For all grid, compute if they are visible by the camera.
+
+    """
+    def __init__(self, cfg, **kwargs):
+        self.voxel_size = np.array(cfg.voxel_size)
+        self.pc_range = np.array(cfg.pc_range)
+        self.size_factor = cfg.out_size_factor
+
+    def __call__(self, res, info):
+        points = res['lidar']['points']
+        points_xy = points[:, :2]
+        grid_size = np.round(
+                        np.divide(
+                            self.pc_range[-3:-1] - self.pc_range[:2],
+                            self.voxel_size[:2]*self.size_factor)
+                        ).astype(np.int32)
+        visible = np.zeros(grid_size[::-1], dtype=np.float32)
+        for ratio in np.linspace(0, 1, 100):
+            x, y = np.round(
+                       np.divide(
+                           points_xy[:, :2]*ratio - self.pc_range[:2],
+                           self.voxel_size[:2]*self.size_factor)
+                       ).astype(np.int32).T
+            visible[(y, x)] += 0.2
+
+        visible = visible.clip(0, 1)
+        from det3d.core import Visualizer
+        vis = Visualizer(self.voxel_size, self.pc_range, self.size_factor)
+        vis.heatmap('visible', visible)
+        vis.pointcloud('points', points[:, :3])
+        vis.show()
+
+        return res, info
+
+@PIPELINES.register_module
+class ComputeOccupancy(object):
+    """For all grid, compute if they are visible by the camera.
+
+    """
+    def __init__(self, cfg, **kwargs):
+        self.voxel_size = np.array(cfg.voxel_size)
+        self.pc_range = np.array(cfg.pc_range)
+        self.size_factor = cfg.out_size_factor
+
+    def __call__(self, res, info):
+        points = res['lidar']['points']
+        points_xy = points[:, :2]
+        grid_size = np.round(
+                        np.divide(
+                            self.pc_range[-3:-1] - self.pc_range[:2],
+                            self.voxel_size[:2]*self.size_factor)
+                        ).astype(np.int32)
+        occupancy = np.zeros(grid_size[::-1], dtype=np.float32)
+        x, y = np.round(
+                   np.divide(
+                       points_xy[:, :2] - self.pc_range[:2],
+                       self.voxel_size[:2]*self.size_factor)
+                   ).astype(np.int32).T
+        occupancy[(y, x)] = 1 
+
+        from det3d.core import Visualizer
+        vis = Visualizer(self.voxel_size, self.pc_range, self.size_factor)
+        vis.heatmap('occupancy', occupancy)
+        vis.pointcloud('points', points[:, :3])
+        vis.show()
+
+        return res, info
 
 @PIPELINES.register_module
 class SeparateForeground(object):
@@ -81,3 +152,5 @@ class SeparateForeground(object):
             res["lidar"]["points"] = points
 
         return res, info
+
+

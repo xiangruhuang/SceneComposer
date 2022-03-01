@@ -29,4 +29,6 @@ __all__ = [
     "ReplaceAug",
     "SceneAug",
     "SeparateForeground",
+    "ComputeVisibility",
+    "ComputeOccupancy",
 ]

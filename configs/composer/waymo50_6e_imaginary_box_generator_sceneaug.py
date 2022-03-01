@@ -44,7 +44,8 @@ model = dict(
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=False,
+    visualize=True,
+    render=False,
 )
 
 assigner = dict(
@@ -52,7 +53,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=500*5,
+    max_objs=500*10,
     min_radius=2,
 )
 
@@ -110,7 +111,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split="train_50",
          cfg=dict(root_path=data_root,
-                  nsweeps=30,
+                  nsweeps=200,
                   class_names=class_names,
                   compress_static=True),
     ),
@@ -119,6 +120,20 @@ train_pipeline = [
          cfg=dict(mode="train",
                   return_objects=False,
                   ignore_empty_boxes=False),
+    ),
+    dict(type="ComputeVisibility",
+         cfg=dict(
+             voxel_size=voxel_generator["voxel_size"],
+             pc_range=voxel_generator["range"],
+             out_size_factor=test_cfg["out_size_factor"],
+         ),
+    ),
+    dict(type="ComputeOccupancy",
+         cfg=dict(
+             voxel_size=voxel_generator["voxel_size"],
+             pc_range=voxel_generator["range"],
+             out_size_factor=test_cfg["out_size_factor"],
+         ),
     ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),

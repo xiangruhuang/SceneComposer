@@ -4,9 +4,9 @@ import numpy as np
 
 class Visualizer:
     def __init__(self,
-                 voxel_size=[],
-                 pc_range=[],
-                 size_factor=8,
+                 voxel_size=None,
+                 pc_range=None,
+                 size_factor=None,
                  radius=2e-4):
         self.voxel_size = voxel_size
         self.pc_range = pc_range
@@ -40,8 +40,9 @@ class Visualizer:
                              torch.arange(num_points-1)+1], dim=-1)
         return ps.register_curve_network(name, points, edges, **kwargs)
    
-    def curvenetwork(self, name, nodes, edges):
-        return ps.register_curve_network(name, nodes, edges, radius=self.radius)
+    def curvenetwork(self, name, nodes, edges, **kwargs):
+        radius = kwargs.get('radius', self.radius)
+        return ps.register_curve_network(name, nodes, edges, radius=radius)
 
     def pointcloud(self, name, pointcloud, color=None, radius=None, **kwargs):
         """Visualize non-zero entries of heat map on 3D point cloud.
@@ -107,25 +108,56 @@ class Visualizer:
                                           defined_on='nodes', enabled=True)
         return ps_box
 
+    def wireframe(self, name, heatmap):
+        size_y, size_x = heatmap.shape
+        x, y = torch.meshgrid(heatmap)
+        return x, y
+
     def heatmap(self, name, heatmap, color=True, threshold=0.1, radius=2e-4,
                 **kwargs):
         """Visualize non-zero entries of heat map on 3D point cloud.
-            heatmap (torch.Tensor, [W, H])
+        `voxel_size`, `size_factor`, `pc_range` need to be specified.
+        By default, the heatmap need to be transposed.
+
+        Args:
+            heatmap (torch.Tensor or np.ndarray, [W, H])
+
         """
         if isinstance(heatmap, np.ndarray):
             heatmap = torch.from_numpy(heatmap)
-        indices = list(torch.where(heatmap > threshold))
-        heights = heatmap[indices]
-        indices = indices[::-1]
-        for i in range(2):
-            indices[i] = indices[i] * self.size_factor * self.voxel_size[i] + self.pc_range[i]
 
-        coors = torch.stack([*indices, heights], dim=-1)
-        ps_p = ps.register_point_cloud(name, coors, radius=radius, **kwargs)
+        if self.voxel_size is None:
+            raise ValueError("self.voxel_size not specified")
+        
+        heatmap = heatmap.T
+        size_x, size_y = heatmap.shape
+        x, y = torch.meshgrid(torch.arange(size_x),
+                              torch.arange(size_y),
+                              indexing="ij")
+        x, y = x.reshape(-1), y.reshape(-1)
+        z = heatmap.reshape(-1)
+
+        mask = torch.zeros(size_x+2, size_y+2, size_x+2, size_y+2, dtype=torch.bool)
+        
+        for dx in [-1, 1]:
+            for dy in [-1, 1]:
+                mask[x+1, y+1, x+1+dx, y+1+dy] = True
+        x0, y0, x1, y1 = torch.where(mask)
+        x0, y0, x1, y1 = x0-1, y0-1, x1-1, y1-1
+        is_inside = ((x1 >= size_x) | (x1 < 0) | (y1 >= size_y) | (y1 < 0)) == False
+        e0 = (x0 * size_y + y0)[is_inside]
+        e1 = (x1 * size_y + y1)[is_inside]
+        
+        edges = torch.stack([e0, e1], dim=-1)
+        x = x * self.size_factor * self.voxel_size[0] + self.pc_range[0]
+        y = y * self.size_factor * self.voxel_size[1] + self.pc_range[1]
+        nodes = torch.stack([x, y, z], dim=-1)
+        ps_c = self.curvenetwork(name, nodes, edges, radius=self.radius*10)
+        
         if color:
-            ps_p.add_scalar_quantity("height", (coors[:, -1]), enabled=True) 
+            ps_c.add_scalar_quantity("height", z, enabled=True) 
 
-        return ps_p
+        return ps_c
 
     def show(self):
         ps.set_up_dir('z_up')

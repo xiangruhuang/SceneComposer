@@ -371,6 +371,7 @@ class AssignLabel(object):
 
             if num_obj > max_objs:
                 print(num_obj, max_objs)
+                print(info.keys())
                 print(info["lidar_path"])
 
             assert num_obj <= max_objs
