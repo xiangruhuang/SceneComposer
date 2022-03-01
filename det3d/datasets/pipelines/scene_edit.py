@@ -35,21 +35,16 @@ class ComputeVisibility(object):
                             self.pc_range[-3:-1] - self.pc_range[:2],
                             self.voxel_size[:2]*self.size_factor)
                         ).astype(np.int32)
-        visible = np.zeros(grid_size[::-1], dtype=np.float32)
+        visibility = np.zeros(grid_size[::-1], dtype=np.float32)
         for ratio in np.linspace(0, 1, 100):
             x, y = np.round(
                        np.divide(
                            points_xy[:, :2]*ratio - self.pc_range[:2],
                            self.voxel_size[:2]*self.size_factor)
                        ).astype(np.int32).T
-            visible[(y, x)] += 0.2
+            visibility[(y, x)] += 0.2
 
-        visible = visible.clip(0, 1)
-        from det3d.core import Visualizer
-        vis = Visualizer(self.voxel_size, self.pc_range, self.size_factor)
-        vis.heatmap('visible', visible)
-        vis.pointcloud('points', points[:, :3])
-        vis.show()
+        res['lidar']['visibility'] = visibility
 
         return res, info
 

@@ -113,7 +113,7 @@ class Visualizer:
         x, y = torch.meshgrid(heatmap)
         return x, y
 
-    def heatmap(self, name, heatmap, color=True, threshold=0.1, radius=2e-4,
+    def heatmap(self, name, heatmap, color=True, threshold=0.1,
                 **kwargs):
         """Visualize non-zero entries of heat map on 3D point cloud.
         `voxel_size`, `size_factor`, `pc_range` need to be specified.
@@ -139,9 +139,8 @@ class Visualizer:
 
         mask = torch.zeros(size_x+2, size_y+2, size_x+2, size_y+2, dtype=torch.bool)
         
-        for dx in [-1, 1]:
-            for dy in [-1, 1]:
-                mask[x+1, y+1, x+1+dx, y+1+dy] = True
+        for dx, dy in [[0, 1], [0, -1], [1, 0], [-1, 0]]:
+            mask[x+1, y+1, x+1+dx, y+1+dy] = True
         x0, y0, x1, y1 = torch.where(mask)
         x0, y0, x1, y1 = x0-1, y0-1, x1-1, y1-1
         is_inside = ((x1 >= size_x) | (x1 < 0) | (y1 >= size_y) | (y1 < 0)) == False
@@ -152,7 +151,8 @@ class Visualizer:
         x = x * self.size_factor * self.voxel_size[0] + self.pc_range[0]
         y = y * self.size_factor * self.voxel_size[1] + self.pc_range[1]
         nodes = torch.stack([x, y, z], dim=-1)
-        ps_c = self.curvenetwork(name, nodes, edges, radius=self.radius*10)
+        radius = kwargs.get("radius", self.radius*10)
+        ps_c = self.curvenetwork(name, nodes, edges, radius=radius)
         
         if color:
             ps_c.add_scalar_quantity("height", z, enabled=True) 
