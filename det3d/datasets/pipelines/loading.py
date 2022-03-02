@@ -1,16 +1,16 @@
 import os.path as osp
 import warnings
 import numpy as np
-from functools import reduce
-
-import pycocotools.mask as maskUtils
-
-from pathlib import Path
-from copy import deepcopy
-from det3d import torchie
-from det3d.core import box_np_ops
 import pickle 
 import os 
+
+import pycocotools.mask as maskUtils
+from pathlib import Path
+from copy import deepcopy
+from functools import reduce
+
+from det3d import torchie
+from det3d.core import box_np_ops
 from ..registry import PIPELINES
 
 def _dict_select(dict_, inds):
@@ -207,5 +207,25 @@ class LoadPointCloudAnnotations(object):
             }
         else:
             pass 
+
+        return res, info
+
+@PIPELINES.register_module
+class LoadGroundPlane(object):
+    def __init__(self, cfg, **kwargs):
+        self.root_path = cfg.root_path
+        self.split = cfg.split
+
+    def __call__(self, res, info):
+
+        annos = get_obj(info['anno_path'])
+        T = annos['veh_to_global'].reshape(4, 4)
+
+        gp_path = info['anno_path'].replace(
+                      'annos', 'ground_plane'
+                  ).replace('_frame_0', '')
+        ground_plane = get_obj(gp_path)['ground_plane']
+        gp = (gp - T[:3, 3]) @ T[:3, :3]
+        res['lidar']['ground_plane'] = gp
 
         return res, info

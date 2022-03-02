@@ -158,7 +158,15 @@ class GroundPlaneEstimator(object):
         # ground plane points in 3D coordinate
         ground_plane = np.stack([x, y, z], axis=-1)
         
-        return ground_plane
+        ground_plane_dict = dict(
+            ground_plane=ground_plane,
+            pc_range=pc_range,
+            grid_size=grid_size,
+            size_factor=self.size_factor,
+            voxel_size=self.voxel_size
+        )
+
+        return ground_plane_dict
 
 def precompute_ground_plane(split, seq_id):
     save_path = f'data/Waymo/{split}/ground_plane'
@@ -167,20 +175,16 @@ def precompute_ground_plane(split, seq_id):
         return
     estimator = GroundPlaneEstimator(
                     dict(
-                        pc_range = [-75.2, -75.2, -2, 75.2, 75.2, 4],
                         size_factor=8,
                         voxel_size=[0.1, 0.1, 0.15],
                         split=split,
                     )
                 )
     seq = Sequence.from_index(seq_id, split=split)
-    ground_plane = estimator(seq)
+    ground_plane_dict = estimator(seq)
 
-    gp_dict = dict(
-        ground_plane=ground_plane,
-    )
-    with open(f'{save_path}/seq_{seq_id}.pkl', 'wb') as fout:
-        pickle.dump(gp_dict, fout)
+    with open(filename, 'wb') as fout:
+        pickle.dump(ground_plane_dict, fout)
 
 def precompute_ground_plane_batch(split, start_seq_id, end_seq_id, num_processes=40):
     args = [(split, seq_id) for seq_id in range(start_seq_id, end_seq_id)]

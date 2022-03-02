@@ -59,6 +59,7 @@ class ComputeOccupancy(object):
         self.size_factor = cfg.out_size_factor
 
     def __call__(self, res, info):
+        import ipdb; ipdb.set_trace()
         points = res['lidar']['points']
         points_xy = points[:, :2]
         grid_size = np.round(

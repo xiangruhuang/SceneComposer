@@ -19,6 +19,7 @@ __all__ = [
     "LoadImageAnnotations",
     "LoadImageFromFile",
     "LoadProposals",
+    "LoadGroundPlane",
     "PhotoMetricDistortion",
     "Preprocess",
     "Voxelization",

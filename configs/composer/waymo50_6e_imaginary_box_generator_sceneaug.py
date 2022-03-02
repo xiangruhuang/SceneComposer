@@ -81,6 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
+data_split = "train_50"
 
 train_preprocessor = dict(
     mode="train",
@@ -108,8 +109,15 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
+    dict(
+        type="LoadGroundPlane",
+        cfg=dict(
+                root_path=data_root,
+                split=data_split,
+            ),
+    ),
     dict(type="SceneAug",
-         split="train_50",
+         split=data_split,
          cfg=dict(root_path=data_root,
                   nsweeps=200,
                   class_names=class_names,
@@ -153,7 +161,7 @@ test_pipeline = [
     dict(type="Reformat"),
 ]
 
-train_anno = "data/Waymo/infos_train_50_01sweeps_filter_zero_gt.pkl"
+train_anno = f"data/Waymo/infos_{data_split}_01sweeps_filter_zero_gt.pkl"
 val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
