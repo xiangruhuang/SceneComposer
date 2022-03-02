@@ -6,7 +6,7 @@ import multiprocessing.pool
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import points_in_convex_polygon_3d_jit
 
-from .frame import Frame, get_frame_id, get_sequence_id
+from det3d.structures.frame import Frame, get_frame_id, get_sequence_id
 
 class Sequence:
     def __init__(

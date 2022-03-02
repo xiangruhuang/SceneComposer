@@ -8,8 +8,10 @@ from torch.nn import functional as F
 from torch_cluster import radius_graph
 from scipy.sparse import csr_matrix
 import fire, os
+from multiprocessing import Pool
+from tqdm import tqdm
 
-from .sequence import Sequence
+from det3d.structures.sequence import Sequence
 from det3d.core import Visualizer
 
 def get_grid_laplacian(dims):
@@ -153,27 +155,16 @@ class GroundPlaneEstimator(object):
         x = x * self.size_factor * self.voxel_size[0] + pc_range[0]
         y = y * self.size_factor * self.voxel_size[1] + pc_range[1]
         
+        # ground plane points in 3D coordinate
         ground_plane = np.stack([x, y, z], axis=-1)
         
-        # visualization
-        #vis = Visualizer(
-        #          voxel_size=self.voxel_size,
-        #          size_factor=self.size_factor,
-        #          pc_range=pc_range
-        #      )
-        #vis.pointcloud('points', points[:, :3])
-        #vis.pointcloud('ground plane', ground_plane.reshape(-1, 3))
-
-        #vis.heatmap('z_min', z_min.T, enabled=False)
-        #vis.heatmap('plane', z.T, radius=2e-4)
-        #vis.heatmap('plane+0.5', z.T+0.5, radius=2e-4)
-        #vis.boxes('boxes', seq.corners, seq.classes)
-
-        #import ipdb; ipdb.set_trace()
-        #vis.show()
         return ground_plane
 
 def precompute_ground_plane(split, seq_id):
+    save_path = f'data/Waymo/{split}/ground_plane'
+    filename = f'{save_path}/seq_{seq_id}.pkl'
+    if os.path.exists(filename):
+        return
     estimator = GroundPlaneEstimator(
                     dict(
                         pc_range = [-75.2, -75.2, -2, 75.2, 75.2, 4],
@@ -184,13 +175,18 @@ def precompute_ground_plane(split, seq_id):
                 )
     seq = Sequence.from_index(seq_id, split=split)
     ground_plane = estimator(seq)
-    save_path = f'data/Waymo/{split}/ground_plane'
 
     gp_dict = dict(
         ground_plane=ground_plane,
     )
     with open(f'{save_path}/seq_{seq_id}.pkl', 'wb') as fout:
         pickle.dump(gp_dict, fout)
+
+def precompute_ground_plane_batch(split, start_seq_id, end_seq_id, num_processes=40):
+    args = [(split, seq_id) for seq_id in range(start_seq_id, end_seq_id)]
+    num_seqs = len(args)
+    with Pool(num_processes) as p: # change according to your cpu
+        r = list(tqdm(p.starmap(precompute_ground_plane, args), total=num_seqs))
 
 if __name__ == '__main__':
     fire.Fire()
