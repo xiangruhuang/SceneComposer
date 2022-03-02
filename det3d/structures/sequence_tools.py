@@ -169,24 +169,25 @@ class GroundPlaneEstimator(object):
         return ground_plane_dict
 
 def precompute_ground_plane(split, seq_id):
-    save_path = f'data/Waymo/{split}/ground_plane'
-    filename = f'{save_path}/seq_{seq_id}.pkl'
-    if os.path.exists(filename):
-        return
-    estimator = GroundPlaneEstimator(
-                    dict(
-                        size_factor=8,
-                        voxel_size=[0.1, 0.1, 0.15],
-                        split=split,
+    try:
+        save_path = f'data/Waymo/{split}/ground_plane'
+        filename = f'{save_path}/seq_{seq_id}.pkl'
+        estimator = GroundPlaneEstimator(
+                        dict(
+                            size_factor=8,
+                            voxel_size=[0.1, 0.1, 0.15],
+                            split=split,
+                        )
                     )
-                )
-    seq = Sequence.from_index(seq_id, split=split)
-    ground_plane_dict = estimator(seq)
+        seq = Sequence.from_index(seq_id, split=split)
+        ground_plane_dict = estimator(seq)
 
-    with open(filename, 'wb') as fout:
-        pickle.dump(ground_plane_dict, fout)
+        with open(filename, 'wb') as fout:
+            pickle.dump(ground_plane_dict, fout)
+    except Exception as e:
+        print(split, seq_id, e)
 
-def precompute_ground_plane_batch(split, start_seq_id, end_seq_id, num_processes=40):
+def precompute_ground_plane_batch(split, start_seq_id, end_seq_id, num_processes=8):
     args = [(split, seq_id) for seq_id in range(start_seq_id, end_seq_id)]
     num_seqs = len(args)
     with Pool(num_processes) as p: # change according to your cpu
