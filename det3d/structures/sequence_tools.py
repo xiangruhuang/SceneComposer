@@ -96,6 +96,7 @@ class GroundPlaneEstimator(object):
 
     def __call__(self, seq):
         seq.toglobal()
+        import ipdb; ipdb.set_trace()
 
         points = seq.points4d[:, :3]
         box_bottoms = seq.corners[:, [0, 3, 4, 7], :].reshape(-1, 3)
@@ -172,6 +173,8 @@ def precompute_ground_plane(split, seq_id):
     try:
         save_path = f'data/Waymo/{split}/ground_plane'
         filename = f'{save_path}/seq_{seq_id}.pkl'
+        if os.path.exists(filename):
+            return
         estimator = GroundPlaneEstimator(
                         dict(
                             size_factor=8,
