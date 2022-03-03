@@ -26,12 +26,6 @@ class Reformat(object):
         if points is not None:
             data_bundle.update(points=points)
 
-        if 'objects' in res["lidar"]:
-            objects = res["lidar"]["objects"]
-            data_bundle.update(
-                objects = objects,
-            )
-
         if 'voxels' in res["lidar"]:
             voxels = res["lidar"]["voxels"] 
 
@@ -42,6 +36,11 @@ class Reformat(object):
                 num_voxels=voxels["num_voxels"],
                 coordinates=voxels["coordinates"],
             )
+        for key in ["visibility", "occupancy", "objects"]:
+            if key in res["lidar"]:
+                data_bundle.update(
+                    {key: res["lidar"][key]}
+                )
 
         if res["mode"] == "train":
             data_bundle.update(res["lidar"]["targets"])

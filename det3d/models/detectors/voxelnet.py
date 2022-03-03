@@ -91,6 +91,8 @@ class VoxelNet(SingleStageDetector):
             #        center_[1] += dims[1]*2*dy
             vis.look_at(center)
             vis.heatmap('hm', example['hm'][0][i, 0].detach().cpu())
+            vis.heatmap('visibility', example['visibility'][i].detach().cpu().T)
+            vis.heatmap('occupancy', example['occupancy'][i].detach().cpu().T)
             if self.visualize:
                 vis.show()
                 import ipdb; ipdb.set_trace()

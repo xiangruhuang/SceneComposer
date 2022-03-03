@@ -19,7 +19,6 @@ __all__ = [
     "LoadImageAnnotations",
     "LoadImageFromFile",
     "LoadProposals",
-    "LoadGroundPlane",
     "PhotoMetricDistortion",
     "Preprocess",
     "Voxelization",
@@ -32,4 +31,5 @@ __all__ = [
     "SeparateForeground",
     "ComputeVisibility",
     "ComputeOccupancy",
+    "ComputeGroundPlaneMask",
 ]

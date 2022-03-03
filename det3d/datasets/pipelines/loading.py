@@ -209,23 +209,3 @@ class LoadPointCloudAnnotations(object):
             pass 
 
         return res, info
-
-@PIPELINES.register_module
-class LoadGroundPlane(object):
-    def __init__(self, cfg, **kwargs):
-        self.root_path = cfg.root_path
-        self.split = cfg.split
-
-    def __call__(self, res, info):
-
-        annos = get_obj(info['anno_path'])
-        T = annos['veh_to_global'].reshape(4, 4)
-
-        gp_path = info['anno_path'].replace(
-                      'annos', 'ground_plane'
-                  ).replace('_frame_0', '')
-        ground_plane = get_obj(gp_path)['ground_plane']
-        gp = (gp - T[:3, 3]) @ T[:3, :3]
-        res['lidar']['ground_plane'] = gp
-
-        return res, info

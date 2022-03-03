@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import pickle
 
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import points_in_convex_polygon_3d_jit
@@ -17,6 +18,23 @@ def remove_empty_boxes(indices, attr_dict):
 
     return indices, new_attr_dict
 
+def get_obj(path):
+    with open(path, 'rb') as fin:
+        return pickle.load(fin)
+
+class Projector(object):
+    def __init__(self, voxel_size, pc_range):
+        self.voxel_size = voxel_size
+        self.pc_range = pc_range
+
+    def __call__(self, points):
+        return np.floor(
+                   np.divide(
+                       points[:, :2] - self.pc_range[:2],
+                       self.voxel_size[:2]
+                   )
+               ).astype(np.int32)
+
 @PIPELINES.register_module
 class ComputeVisibility(object):
     """For all grid, compute if they are visible by the camera.
@@ -26,62 +44,89 @@ class ComputeVisibility(object):
         self.voxel_size = np.array(cfg.voxel_size)
         self.pc_range = np.array(cfg.pc_range)
         self.size_factor = cfg.out_size_factor
+        self.projector = Projector(self.voxel_size*self.size_factor, self.pc_range)
 
     def __call__(self, res, info):
         points = res['lidar']['points']
         points_xy = points[:, :2]
-        grid_size = np.round(
-                        np.divide(
-                            self.pc_range[-3:-1] - self.pc_range[:2],
-                            self.voxel_size[:2]*self.size_factor)
-                        ).astype(np.int32)
-        visibility = np.zeros(grid_size[::-1], dtype=np.float32)
+        grid_size = self.projector(self.pc_range[np.newaxis, -3:-1])[0]
+        visibility = np.zeros(grid_size, dtype=np.float32)
         for ratio in np.linspace(0, 1, 100):
-            x, y = np.round(
-                       np.divide(
-                           points_xy[:, :2]*ratio - self.pc_range[:2],
-                           self.voxel_size[:2]*self.size_factor)
-                       ).astype(np.int32).T
-            visibility[(y, x)] += 0.2
+            x, y = self.projector(points_xy*ratio).T
+            x = x.clip(0, grid_size[0]-1)
+            y = y.clip(0, grid_size[1]-1)
+            visibility[(x, y)] += 0.2
 
-        res['lidar']['visibility'] = visibility
+        res['lidar']['visibility'] = visibility.clip(0, 1)
 
         return res, info
 
+
+@PIPELINES.register_module
+class ComputeGroundPlaneMask(object):
+    def __init__(self, threshold, **kwargs):
+        self.threshold = threshold 
+    
+    def __call__(self, res, info):
+        
+        # transform points into world coordinate system
+        annos = get_obj(info['anno_path'])
+        T = annos['veh_to_global'].reshape(4, 4)
+        points_xyz = res['lidar']['points'][:, :3]
+        points_xyz = points_xyz @ T[:3, :3].T + T[:3, 3]
+
+        # load ground plane (in world coord. system)
+        tokens = info['anno_path'].split('/')
+        seq_id = int(tokens[-1].split('_')[1])
+        tokens[-1] = f'seq_{seq_id}.pkl'
+        gp_path = '/'.join(tokens).replace('annos', 'ground_plane')
+        gp_dict = get_obj(gp_path)
+        ground_plane = gp_dict["ground_plane"]
+        projector = Projector(gp_dict["voxel_size"]*gp_dict["size_factor"],
+                              gp_dict["pc_range"])
+
+        # find relative height of each point
+        vx, vy = projector(points_xyz[:, :2]).T
+        ground_z = ground_plane[(vx, vy, 2)]
+        height = points_xyz[:, 2] - ground_z
+
+        is_ground = (height < self.threshold)[:, np.newaxis].astype(np.float32)
+        res["lidar"]["points"] = np.concatenate(
+                                     [res["lidar"]["points"], is_ground],
+                                     axis=-1)
+
+        return res, info
+
+
 @PIPELINES.register_module
 class ComputeOccupancy(object):
-    """For all grid, compute if they are visible by the camera.
+    """For all grid, compute if they are occupied by the background.
 
     """
     def __init__(self, cfg, **kwargs):
         self.voxel_size = np.array(cfg.voxel_size)
         self.pc_range = np.array(cfg.pc_range)
         self.size_factor = cfg.out_size_factor
+        self.projector = Projector(self.voxel_size*self.size_factor, self.pc_range)
 
     def __call__(self, res, info):
-        import ipdb; ipdb.set_trace()
         points = res['lidar']['points']
         points_xy = points[:, :2]
-        grid_size = np.round(
-                        np.divide(
-                            self.pc_range[-3:-1] - self.pc_range[:2],
-                            self.voxel_size[:2]*self.size_factor)
-                        ).astype(np.int32)
-        occupancy = np.zeros(grid_size[::-1], dtype=np.float32)
-        x, y = np.round(
-                   np.divide(
-                       points_xy[:, :2] - self.pc_range[:2],
-                       self.voxel_size[:2]*self.size_factor)
-                   ).astype(np.int32).T
-        occupancy[(y, x)] = 1 
+        grid_size = self.projector(self.pc_range[np.newaxis, -3:-1])[0]
+        occupancy = np.zeros(grid_size, dtype=np.float32)
+        is_ground = points[:, -1].astype(np.int32)
+        
+        x, y = self.projector(points_xy[is_ground == False]).T
+        x = x.clip(0, grid_size[0]-1)
+        y = y.clip(0, grid_size[1]-1)
+        occupancy[(x, y)] = 1
+        visibility = res["lidar"]["visibility"]
+        res["lidar"]["points"] = res["lidar"]["points"][:, :-1]
 
-        from det3d.core import Visualizer
-        vis = Visualizer(self.voxel_size, self.pc_range, self.size_factor)
-        vis.heatmap('occupancy', occupancy)
-        vis.pointcloud('points', points[:, :3])
-        vis.show()
+        res["lidar"]["occupancy"] = occupancy
 
         return res, info
+
 
 @PIPELINES.register_module
 class SeparateForeground(object):

@@ -109,13 +109,7 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    dict(
-        type="LoadGroundPlane",
-        cfg=dict(
-                root_path=data_root,
-                split=data_split,
-            ),
-    ),
+    dict(type="ComputeGroundPlaneMask", threshold=0.75),
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
