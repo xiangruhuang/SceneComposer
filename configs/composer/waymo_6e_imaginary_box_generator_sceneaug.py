@@ -5,7 +5,7 @@ from det3d.utils.config_tool import get_downsample_factor
 from configs import augmentations
 
 tasks = [
-    dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
+    dict(num_class=1, class_names=['VEHICLE']),
 ]
 
 class_names = list(itertools.chain(*[t["class_names"] for t in tasks]))
@@ -36,15 +36,16 @@ model = dict(
         logger=logging.getLogger("RPN"),
     ),
     bbox_head=dict(
-        type="CenterHead",
+        type="CenterHead2",
         in_channels=sum([256, 256]),
         tasks=tasks,
         dataset='waymo',
         weight=2,
-        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
+        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0],
+        common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
+    render=False,
 )
 
 assigner = dict(
@@ -52,7 +53,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=1000,
+    max_objs=500*10,
     min_radius=2,
 )
 
@@ -69,7 +70,7 @@ test_cfg = dict(
         nms_post_max_size=500,
         nms_iou_threshold=0.7,
     ),
-    score_threshold=0.1,
+    score_threshold=0.4,
     pc_range=[-75.2, -75.2],
     out_size_factor=get_downsample_factor(model),
     voxel_size=[0.1, 0.1],
@@ -80,6 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
+data_split = "train"
 
 train_preprocessor = dict(
     mode="train",
@@ -107,18 +109,36 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    augmentations.scene_aug(
-        nsweeps=2, split='train'
+    dict(type="ComputeGroundPlaneMask", threshold=0.75),
+    dict(type="SceneAug",
+         split=data_split,
+         cfg=dict(root_path=data_root,
+                  nsweeps=200,
+                  class_names=class_names,
+                  compress_static=True),
     ),
     augmentations.affine_aug(),
+    dict(type="ComputeVisibility",
+         cfg=dict(
+             voxel_size=voxel_generator["voxel_size"],
+             pc_range=voxel_generator["range"],
+             out_size_factor=test_cfg["out_size_factor"],
+         ),
+    ),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
-                  return_objects=True,
-                  ignore_empty_boxes=True,
-                  class_names=class_names),
-        ),
+                  return_objects=False,
+                  ignore_empty_boxes=False),
+    ),
+    dict(type="ComputeOccupancy",
+         cfg=dict(
+             voxel_size=voxel_generator["voxel_size"],
+             pc_range=voxel_generator["range"],
+             out_size_factor=test_cfg["out_size_factor"],
+         ),
+    ),
     dict(type="Voxelization", cfg=voxel_generator),
-    dict(type="AssignLabel", cfg=train_cfg["assigner"]),
+    dict(type="AssignLabel2", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 test_pipeline = [
@@ -127,14 +147,15 @@ test_pipeline = [
     dict(type="Preprocess", cfg=val_preprocessor),
     dict(type="SeparateForeground",
          cfg=dict(mode="train",
-                  class_names=class_names),
-        ),
+                  return_objects=False,
+                  ignore_empty_boxes=False),
+    ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 
-train_anno = "data/Waymo/infos_train_01sweeps_filter_zero_gt.pkl"
+train_anno = f"data/Waymo/infos_{data_split}_01sweeps_filter_zero_gt.pkl"
 val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
