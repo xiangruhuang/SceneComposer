@@ -192,6 +192,38 @@ def collate_kitti(batch_list, samples_per_gpu=1):
             ret[key] = torch.tensor(np.stack(elems, axis=0))
         elif key in ["visibility", "occupancy"]:
             ret[key] = torch.tensor(np.stack(elems, axis=0))
+        elif key in ['batch_data']:
+            # elems: list of dict(gt_boxes_and_cls, anno_boxes)
+            _dict = defaultdict(list)
+            for elem in elems:
+                for key, val in elem.items():
+                    if isinstance(val, np.ndarray):
+                        _dict[key].append(torch.tensor(val))
+                    else:
+                        _dict[key].append(val)
+
+            # _dict: dict(gt_boxes_and_cls, anno_boxes) of list
+            for key, val in _dict.items():
+                if key in ["gt_boxes_and_cls"]:
+                    # list of np.ndarray
+                    batch = [torch.full([len(v)], i) for i, v in enumerate(val)]
+                    batch = torch.cat(batch, dim=0)
+                    ret[key] = torch.cat(val, dim=0)
+                    ret[f'{key}_batch'] = batch
+                elif key in ["anno_box", "ind", "neg_ind", "cat"]:
+                    _dict2 = defaultdict(list)
+                    for batch_id, batch_val in enumerate(val):
+                        for task_id, task_val in enumerate(batch_val):
+                            _dict2[str(task_id)].append(torch.tensor(task_val))
+                    _res = []
+                    _batch = []
+                    for task_id, task_vals in _dict2.items():
+                        batch = [torch.full([len(v)], i) for i, v in enumerate(task_vals)]
+                        _batch.append(torch.cat(batch, dim=0))
+                        _res.append(torch.cat(task_vals, dim=0))
+                    ret[key] = _res
+                    ret[f'{key}_batch'] = _batch
+                    
         else:
             ret[key] = np.stack(elems, axis=0)
 

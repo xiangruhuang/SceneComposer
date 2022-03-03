@@ -7,6 +7,7 @@ from .test_aug import DoubleFlip
 from .preprocess import Preprocess, Voxelization
 from .scene_edit import SeparateForeground
 from .augmentation import *
+from .assign import AssignLabel, AssignLabel2
 
 __all__ = [
     "Compose",
@@ -24,6 +25,7 @@ __all__ = [
     "Voxelization",
     "AssignTarget",
     "AssignLabel",
+    "AssignLabel2",
     "AffineAug",
     "GTAug",
     "ReplaceAug",

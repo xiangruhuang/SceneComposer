@@ -379,7 +379,7 @@ def center_to_minmax_2d(centers, dims, origin=0.5):
     return corners[:, [0, 2]].reshape([-1, 4])
 
 
-def limit_period(val, offset=0.5, period=np.pi):
+def limit_period(val, offset=0.5, period=np.pi*2):
     return val - np.floor(val / period + offset) * period
 
 

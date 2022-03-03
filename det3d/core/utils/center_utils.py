@@ -91,6 +91,30 @@ def _transpose_and_gather_feat(feat, ind):
     feat = _gather_feat(feat, ind)
     return feat
 
+def _transpose_and_gather_feat_by_batch(feat, ind, batch):
+    """
+    Args:
+        feat: B X C X H X W
+        ind: N
+        batch: N
+    
+    Returns:
+        feat: N X C
+    """
+    # [B, H, W, C] <- [B, C, H, W].permute()
+    feat = feat.permute(0, 2, 3, 1).contiguous()
+
+    # [B, H*W, C] <- [B, H, W, C].view(B, -1, C)
+    feat = feat.view(feat.size(0), -1, feat.size(3))
+    
+    feat = feat[(batch, ind)]
+
+    return feat
+
+    # [B, M, C] <- gather([B, H*W, C], [B, M])
+    feat = _gather_feat(feat, ind)
+    return feat
+
 def _circle_nms(boxes, min_radius, post_max_size=83):
     """
     NMS according to center distance

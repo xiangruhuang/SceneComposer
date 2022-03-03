@@ -36,15 +36,15 @@ model = dict(
         logger=logging.getLogger("RPN"),
     ),
     bbox_head=dict(
-        type="CenterHead",
+        type="CenterHead2",
         in_channels=sum([256, 256]),
         tasks=tasks,
         dataset='waymo',
         weight=2,
-        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-        common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
+        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0],
+        common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=True,
+    visualize=False,
     render=False,
 )
 
@@ -118,17 +118,17 @@ train_pipeline = [
                   compress_static=True),
     ),
     augmentations.affine_aug(),
-    dict(type="SeparateForeground",
-         cfg=dict(mode="train",
-                  return_objects=False,
-                  ignore_empty_boxes=False),
-    ),
     dict(type="ComputeVisibility",
          cfg=dict(
              voxel_size=voxel_generator["voxel_size"],
              pc_range=voxel_generator["range"],
              out_size_factor=test_cfg["out_size_factor"],
          ),
+    ),
+    dict(type="SeparateForeground",
+         cfg=dict(mode="train",
+                  return_objects=False,
+                  ignore_empty_boxes=False),
     ),
     dict(type="ComputeOccupancy",
          cfg=dict(
@@ -138,7 +138,7 @@ train_pipeline = [
          ),
     ),
     dict(type="Voxelization", cfg=voxel_generator),
-    dict(type="AssignLabel", cfg=train_cfg["assigner"]),
+    dict(type="AssignLabel2", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 test_pipeline = [
