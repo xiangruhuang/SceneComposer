@@ -2,6 +2,7 @@ import itertools
 import logging
 
 from det3d.utils.config_tool import get_downsample_factor
+from configs import augmentations
 
 tasks = [
     dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
@@ -127,6 +128,7 @@ train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=train_preprocessor),
+    augmentations.affine_aug(),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),

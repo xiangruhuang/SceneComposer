@@ -145,6 +145,7 @@ def main():
     for i in range(0, 1000, 100):
         start_time = time.time()
         data = datasets[0][i]
+        import ipdb; ipdb.set_trace()
         print(f'time={time.time()-start_time}')
 
 if __name__ == "__main__":

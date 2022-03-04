@@ -3,14 +3,9 @@ import numpy as np
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import points_in_convex_polygon_3d_jit
 from det3d.core.sampler import preprocess as prep
-from det3d.builder import build_dbsampler
 
 from det3d.core.input.voxel_generator import VoxelGenerator
-from det3d.core.utils.center_utils import (
-    draw_umich_gaussian, gaussian_radius
-)
 from ..registry import PIPELINES
-
 
 def _dict_select(dict_, inds):
     for k, v in dict_.items():
