@@ -203,7 +203,7 @@ class Frame:
         if hasattr(self, 'global_speed'):
             global_speed = self.global_speed
         else:
-            global_speed = np.zeros((np.box_centers.shape[0], 2))
+            global_speed = np.zeros((self.box_centers.shape[0], 2))
         return np.concatenate(
                    [self.box_centers,
                     self.box_dims,
