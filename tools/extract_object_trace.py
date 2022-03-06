@@ -34,11 +34,19 @@ if __name__ == '__main__':
             points[:, :2] = points[:, :2] @ R.T
             origin = -box[:3]
             origin[:2] = origin[:2] @ R.T
+            from det3d.core import Visualizer
+            vis = Visualizer()
+            vis.pointcloud('points', points[:, :3])
+
+            import ipdb; ipdb.set_trace()
+            vis.boxes('box', box, np.full(box.shape[0], 0))
+            vis.show()
             
             if traces.get(uid, None) is None:
-                traces[uid] = dict(points=[], origins=[])
+                traces[uid] = dict(points=[], origins=[], boxes=[])
             traces[uid]['points'].append(points)
             traces[uid]['origins'].append(origin)
-        with open(f'{args.result_path}/{class_name}.pkl', 'wb') as fout:
-            pickle.dump(traces, fout)
+            traces[uid]['boxes'].append(box)
+        #with open(f'{args.result_path}/{class_name}.pkl', 'wb') as fout:
+        #    pickle.dump(traces, fout)
 

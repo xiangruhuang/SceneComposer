@@ -4,6 +4,7 @@ import torch
 from .. import builder
 from ..registry import COMPOSERS
 
+@COMPOSERS.register_module
 class Discriminator(nn.Module):
     def __init__(
         self,

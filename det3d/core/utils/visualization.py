@@ -80,6 +80,15 @@ class Visualizer:
         corners, faces = self.get_meshes(planes[:, :3], planes[:, 6:8], planes[:, 8:14])
         return ps.register_surface_mesh(name, corners, faces)
 
+    def boxes_from_attr(self, name, attr, labels=None, **kwargs):
+        from det3d.core.bbox import box_np_ops
+        corners = box_np_ops.center_to_corner_box3d(
+                      attr[:, :3],
+                      attr[:, 3:6],
+                      attr[:, -1],
+                      axis=2)
+        self.boxes(name, corners, labels, **kwargs)
+
     def boxes(self, name, corners, labels=None, **kwargs):
         """
             corners (shape=[N, 8, 3]):

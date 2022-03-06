@@ -81,7 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
-data_split = "train_50"
+data_split = "train"
 
 train_preprocessor = dict(
     mode="train",

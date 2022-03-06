@@ -223,10 +223,14 @@ class AssignLabel2(object):
                                            )
                 neg_mask = (visibility.T < 0.05) | (occupancy.T == 1)
                 neg_index = np.where(neg_mask)
+                for cls in range(hm.shape[0]):
+                    hm[(cls, *neg_index)] = -1.0
+                hm = (hm + 1.0) / 2.0
                 neg_index = neg_index[1] * hm.shape[2] + neg_index[0]
                 neg_index = neg_index.astype(np.int64)
 
                 hms.append(hm)
+                
                 anno_boxs.append(anno_box)
                 indices.append(index)
                 cats.append(cat)
