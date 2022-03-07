@@ -32,7 +32,7 @@ model = dict(
         ds_num_filters=[128, 256],
         us_layer_strides=[1, 2],
         us_num_filters=[256, 256],
-        num_input_features=256,
+        num_input_features=258,
         logger=logging.getLogger("RPN"),
     ),
     bbox_head=dict(
@@ -45,7 +45,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=False,
+    render=True,
 )
 
 assigner = dict(
