@@ -40,7 +40,6 @@ model = dict(
         in_channels=sum([256, 256]),
         tasks=tasks,
         dataset='waymo',
-        consrv_weight=0.01,
         weight=2,
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0],
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
@@ -82,7 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
-data_split = "train"
+data_split = "train_1"
 
 train_preprocessor = dict(
     mode="train",
@@ -114,7 +113,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
-                  nsweeps=200,
+                  nsweeps=10,
                   class_names=class_names,
                   compress_static=True),
     ),
@@ -172,6 +171,7 @@ data = dict(
         class_names=class_names,
         pipeline=train_pipeline,
         load_interval=10,
+        repeat=100,
     ),
     val=dict(
         type=dataset_type,
@@ -217,7 +217,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 60
+total_epochs = 600
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

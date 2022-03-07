@@ -172,6 +172,7 @@ class CenterHead2(nn.Module):
         tasks=[],
         dataset='nuscenes',
         weight=0.25,
+        consrv_weight=0,
         code_weights=[],
         common_heads=dict(),
         logger=None,
@@ -186,6 +187,7 @@ class CenterHead2(nn.Module):
         self.class_names = [t["class_names"] for t in tasks]
         self.code_weights = code_weights 
         self.weight = weight  # weight between hm loss and loc loss
+        self.consrv_weight = consrv_weight
         self.dataset = dataset
 
         self.in_channels = in_channels
@@ -291,7 +293,7 @@ class CenterHead2(nn.Module):
 
             consrv_loss = self.consrv_loss(preds_dict['hm'], example['hm'][task_id])
 
-            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * 0.00
+            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * self.consrv_weight
 
             ret.update(dict(
                             loss = loss,
