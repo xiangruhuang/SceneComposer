@@ -193,6 +193,7 @@ class CenterHead2(nn.Module):
 
         self.crit = FastFocalLoss2()
         self.crit_reg = RegLoss2()
+        self.consrv_loss = ConservativeHM()
 
         self.box_n_dim = 9 if 'vel' in common_heads else 7  
         self.use_direction_classifier = False 
@@ -288,12 +289,15 @@ class CenterHead2(nn.Module):
 
             loc_loss = (box_loss*box_loss.new_tensor(self.code_weights)).sum()
 
-            loss = hm_loss + self.weight*loc_loss
+            consrv_loss = self.consrv_loss(preds_dict['hm'], example['hm'][task_id])
+
+            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * 0.1
 
             ret.update(dict(
                             loss = loss,
                             hm_loss = hm_loss.detach().cpu(),
                             loc_loss = loc_loss,
+                            consrv_loss = consrv_loss,
                             loc_loss_elem = box_loss.detach().cpu(),
                             num_positive = torch.tensor(example['ind'][task_id].shape[0]))
                       ) 

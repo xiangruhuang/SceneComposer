@@ -60,8 +60,8 @@ class VoxelNet(SingleStageDetector):
                 input_features, data["coors"], data["batch_size"], data["input_shape"]
             )
 
-        visibility = example['visibility'].unsqueeze(1).to(x.device)
-        occupancy = example['occupancy'].unsqueeze(1).to(x.device)
+        visibility = example['visibility'].unsqueeze(1).transpose(-1, -2).to(x.device)
+        occupancy = example['occupancy'].unsqueeze(1).transpose(-1, -2).to(x.device)
         x = torch.cat([x, visibility, occupancy], dim=1)
 
         if self.with_neck:
@@ -81,11 +81,13 @@ class VoxelNet(SingleStageDetector):
             token = example['metadata'][i]['token'].split('.')[0]
             visit_time = self.epoch_dict[token]
             self.epoch_dict[token] += 1
+            if visit_time % 10 != 0:
+                continue
 
             points = example['points'][i].detach().cpu()
 
             vis.clear()
-            vis.pointcloud('points', points[:, :3])
+            #vis.pointcloud('points', points[:, :3])
 
             # get boxes
             if 'mask' in example:
@@ -123,12 +125,12 @@ class VoxelNet(SingleStageDetector):
                 vis.screenshot(path)
                 img1 = np.array(Image.open(path))
                 pred_hm = preds[0]['hm'][i, 0].detach().cpu()
+                pred_hm = self.bbox_head._sigmoid(pred_hm)
                 vis.heatmap('hm', pred_hm)
                 vis.screenshot(path)
                 img2 = np.array(Image.open(path))
                 img = np.concatenate([img1, img2], axis=0)
                 Image.fromarray(img).save(path)
-                
 
     def forward(self, example, return_loss=True, **kwargs):
         x, _ = self.extract_feat(example)

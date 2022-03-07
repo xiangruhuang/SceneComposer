@@ -90,22 +90,34 @@ class FastFocalLoss2(nn.Module):
       ind, mask: B x M
       cat (category id for peaks): B x M
     '''
-    #gt = torch.pow(target, 4)
+    gt = torch.pow(target, 4)
 
     out_neg = _transpose_and_gather_feat_by_batch(out, neg_ind, neg_batch)
+    gt_neg = _transpose_and_gather_feat_by_batch(gt, neg_ind, neg_batch)
 
-    neg_loss = torch.log(1 - out_neg) * torch.pow(out_neg, 2)
+    neg_loss = torch.log(1 - out_neg) * torch.pow(out_neg, 2) * (1-gt_neg)
     neg_loss = neg_loss.sum()
 
     # [N, C]
-    pos_loss = torch.log(out) * torch.pow(1 - out, 2) * target
-    #pos_pred_pix = _transpose_and_gather_feat_by_batch(out, ind, batch)
-    #pos_pred = pos_pred_pix.gather(1, cat.unsqueeze(2)) # B x M
+    pos_pred_pix = _transpose_and_gather_feat_by_batch(out, ind, batch)
+    pos_pred = pos_pred_pix.gather(1, cat.unsqueeze(1)) # B x M
+    #pos_target = _transpose_and_gather_feat_by_batch(target, ind, batch)
 
     num_pos = ind.shape[0]
-    #pos_loss = torch.log(pos_pred) * torch.pow(1 - pos_pred, 2) * \
-    #           mask.unsqueeze(2)
+    pos_loss = torch.log(pos_pred) * torch.pow(1 - pos_pred, 2)
     pos_loss = pos_loss.sum()
     if num_pos == 0:
       return - neg_loss
     return - (pos_loss + neg_loss) / num_pos
+
+class ConservativeHM(nn.Module):
+  def __init__(self):
+    super(ConservativeHM, self).__init__()
+
+  def forward(self, out, target):
+    mask = target > 1e-5
+    out_nonneg = out[mask].view(-1)
+    consrv_loss = torch.log(1 - out_nonneg) * torch.pow(1 - out_nonneg, 2)
+    consrv_loss = consrv_loss.mean()
+
+    return - consrv_loss

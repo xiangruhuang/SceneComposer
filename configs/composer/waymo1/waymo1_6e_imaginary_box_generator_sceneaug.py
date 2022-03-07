@@ -113,7 +113,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
-                  nsweeps=200,
+                  nsweeps=2,
                   class_names=class_names,
                   compress_static=True),
     ),
@@ -216,7 +216,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 6
+total_epochs = 600
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

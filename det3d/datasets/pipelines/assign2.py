@@ -152,6 +152,9 @@ class HeatmapGenerator(object):
             draw_gaussian(hm[cls_id-1], ct[:2], rad)
         
         # record indices of peak
+        #pos_indices = np.where(hm > 0)
+        #classes = pos_indices[0]
+        #indices = pos_indices[1] * feature_map_size[0] + pos_indices[2]
         indices = coors_int[:, 1] * feature_map_size[0] + coors_int[:, 0]
 
         velo, rot = boxes[:, 6:8], boxes[:, -1]
@@ -225,7 +228,7 @@ class AssignLabel2(object):
                 neg_index = np.where(neg_mask)
                 for cls in range(hm.shape[0]):
                     hm[(cls, *neg_index)] = -1.0
-                hm = (hm + 1.0) / 2.0
+                hm = (hm + 1.0)/2.0
                 neg_index = neg_index[1] * hm.shape[2] + neg_index[0]
                 neg_index = neg_index.astype(np.int64)
 
