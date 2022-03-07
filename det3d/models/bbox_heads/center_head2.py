@@ -291,7 +291,7 @@ class CenterHead2(nn.Module):
 
             consrv_loss = self.consrv_loss(preds_dict['hm'], example['hm'][task_id])
 
-            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * 0.1
+            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * 0.00
 
             ret.update(dict(
                             loss = loss,

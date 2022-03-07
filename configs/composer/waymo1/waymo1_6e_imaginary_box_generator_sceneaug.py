@@ -113,7 +113,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
-                  nsweeps=2,
+                  nsweeps=10,
                   class_names=class_names,
                   compress_static=True),
     ),
@@ -170,6 +170,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
+        load_interval=10,
         repeat=100,
     ),
     val=dict(
