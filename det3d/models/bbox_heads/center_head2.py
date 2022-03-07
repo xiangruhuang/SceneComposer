@@ -360,8 +360,6 @@ class CenterHead2(nn.Module):
 
             batch_hm = torch.sigmoid(preds_dict['hm'])
 
-            batch_dim = torch.exp(preds_dict['dim'])
-
             batch_rots = preds_dict['rot'][..., 0:1]
             batch_rotc = preds_dict['rot'][..., 1:2]
             batch_reg = preds_dict['reg']
@@ -406,7 +404,15 @@ class CenterHead2(nn.Module):
             batch_hei = batch_hei.reshape(batch, H*W, 1)
 
             batch_rot = batch_rot.reshape(batch, H*W, 1)
-            batch_dim = batch_dim.reshape(batch, H*W, 3)
+
+            if 'dim' in preds_dict:
+                batch_dim = torch.exp(preds_dict['dim'])
+                if double_flip:
+                    batch_dim = batch_dim.mean(dim=1)
+                batch_dim = batch_dim.reshape(batch, H*W, 3)
+            else:
+                batch_dim = torch.ones(batch, H*W, 3).to(batch_hm)
+
             batch_hm = batch_hm.reshape(batch, H*W, num_cls)
 
             ys, xs = torch.meshgrid([torch.arange(0, H), torch.arange(0, W)])

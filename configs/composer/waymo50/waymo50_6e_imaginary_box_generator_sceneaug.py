@@ -45,7 +45,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=True,
+    render=False,
 )
 
 assigner = dict(
@@ -81,7 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
-data_split = "train"
+data_split = ["train_50", "val_50"]
 
 train_preprocessor = dict(
     mode="train",
@@ -111,7 +111,7 @@ train_pipeline = [
     dict(type="Preprocess", cfg=train_preprocessor),
     dict(type="ComputeGroundPlaneMask", threshold=0.75),
     dict(type="SceneAug",
-         split=data_split,
+         split=data_split[0],
          cfg=dict(root_path=data_root,
                   nsweeps=200,
                   class_names=class_names,
@@ -155,8 +155,8 @@ test_pipeline = [
     dict(type="Reformat"),
 ]
 
-train_anno = f"data/Waymo/infos_{data_split}_01sweeps_filter_zero_gt.pkl"
-val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
+train_anno = f"data/Waymo/infos_{data_split[0]}_01sweeps_filter_zero_gt.pkl"
+val_anno = f"data/Waymo/infos_{data_split[1]}_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
@@ -180,6 +180,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=test_pipeline,
+        load_interval=100,
     ),
     test=dict(
         type=dataset_type,

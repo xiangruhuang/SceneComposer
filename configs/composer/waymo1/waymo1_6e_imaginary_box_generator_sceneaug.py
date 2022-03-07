@@ -45,7 +45,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=True,
+    render=False,
 )
 
 assigner = dict(
@@ -81,7 +81,7 @@ test_cfg = dict(
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
-data_split = "train_50"
+data_split = "train_1"
 
 train_preprocessor = dict(
     mode="train",
@@ -170,6 +170,7 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
+        repeat=100,
     ),
     val=dict(
         type=dataset_type,

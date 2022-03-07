@@ -30,6 +30,7 @@ class WaymoDataset(PointCloudDataset):
         sample=False,
         nsweeps=1,
         load_interval=1,
+        repeat=1,
         **kwargs,
     ):
         self.load_interval = load_interval 
@@ -53,6 +54,11 @@ class WaymoDataset(PointCloudDataset):
             _waymo_infos_all = pickle.load(f)
 
         self._waymo_infos = _waymo_infos_all[::self.load_interval]
+        if self.repeat > 1:
+            _waymo_infos = []
+            for i in range(self.repeat):
+                _waymo_infos += self._waymo_infos
+            self._waymo_infos = _waymo_infos
 
         print("Using {} Frames".format(len(self._waymo_infos)))
 
