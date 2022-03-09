@@ -159,6 +159,13 @@ class HeatmapGenerator(object):
 
         velo, rot = boxes[:, 6:8], boxes[:, -1]
 
+        # remove unique indices
+        unique_indices, reverse_indices = np.unique(indices, return_index=True)
+        coors, coors_int = coors[reverse_indices], coors_int[reverse_indices]
+        boxes, classes = boxes[reverse_indices], classes[reverse_indices]
+        velo, rot = velo[reverse_indices], rot[reverse_indices]
+        indices = unique_indices
+
         anno_box = np.concatenate(
                 [coors[:, :2] - coors_int[:, :2],
                  boxes[:, 2:3],

@@ -46,7 +46,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=True,
+    render=False,
 )
 
 assigner = dict(
@@ -217,7 +217,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 60
+total_epochs = 20
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"

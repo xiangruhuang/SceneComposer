@@ -162,7 +162,7 @@ class VoxelNet(SingleStageDetector):
             # manual deepcopy ...
             new_preds = []
             for pred in preds:
-                new_pred = {} 
+                new_pred = {}
                 for k, v in pred.items():
                     new_pred[k] = v.detach()
                 new_preds.append(new_pred)

@@ -45,7 +45,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=True,
+    render=False,
 )
 
 assigner = dict(
@@ -113,7 +113,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
-                  nsweeps=10,
+                  nsweeps=200,
                   class_names=class_names,
                   compress_static=True),
     ),
