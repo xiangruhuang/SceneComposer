@@ -114,7 +114,7 @@ train_pipeline = [
     dict(type="SceneAug",
          split=data_split,
          cfg=dict(root_path=data_root,
-                  nsweeps=10,
+                  nsweeps=200,
                   class_names=class_names,
                   compress_static=True),
     ),

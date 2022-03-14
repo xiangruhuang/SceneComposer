@@ -79,10 +79,10 @@ class VoxelNet(SingleStageDetector):
 
         for i in range(num_samples):
             token = example['metadata'][i]['token'].split('.')[0]
+            seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
+
             visit_time = self.epoch_dict[token]
             self.epoch_dict[token] += 1
-            if visit_time % 10 != 0:
-                continue
 
             points = example['points'][i].detach().cpu()
 
@@ -160,7 +160,7 @@ class VoxelNet(SingleStageDetector):
             # manual deepcopy ...
             new_preds = []
             for pred in preds:
-                new_pred = {} 
+                new_pred = {}
                 for k, v in pred.items():
                     new_pred[k] = v.detach()
                 new_preds.append(new_pred)
