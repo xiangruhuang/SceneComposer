@@ -80,8 +80,6 @@ class VoxelNet(SingleStageDetector):
         for i in range(num_samples):
             token = example['metadata'][i]['token'].split('.')[0]
             seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
-            if seq_id % 5 == 0:
-                continue
 
             visit_time = self.epoch_dict[token]
             self.epoch_dict[token] += 1
