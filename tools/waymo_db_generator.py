@@ -46,11 +46,13 @@ def generate_waymo_db(
 
     root_path = Path(data_path)
 
+    suffix = info_path.split('/')[-1].replace('infos_', '').replace('.pkl', '')
+
     if dataset_class_name in ["WAYMO"]: 
         if db_path is None:
-            db_path = root_path / f"gt_database_{split}_1sweeps_withvelo"
+            db_path = root_path / f"gt_database_{suffix}"
         if dbinfo_path is None:
-            dbinfo_path = root_path / f"dbinfos_{split}_1sweeps_withvelo.pkl"
+            dbinfo_path = root_path / f"dbinfos_{suffix}.pkl"
     else:
         raise NotImplementedError()
 
@@ -168,13 +170,14 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="""
                     example:
-                        python tools/waymo_info_parser.py waymo/training train
+                        python tools/waymo_db_generator.py data/Waymo train <info_path>
                     """,
 
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('root_path', type=str)
     parser.add_argument('split', type=str)
+    parser.add_argument('info_path', type=str)
 
     args = parser.parse_args()
 
@@ -184,9 +187,8 @@ if __name__ == "__main__":
     args = parse_args()
 
     nsweeps = 1
-    info_path = Path(args.root_path) / f"infos_{args.split}_{nsweeps:02d}sweeps_filter_zero_gt.pkl"
     generate_waymo_db(
-        args.root_path, args.split, info_path,
+        args.root_path, args.split, args.info_path,
         used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
         nsweeps=1
     )

@@ -8,8 +8,6 @@ import argparse, os
 from nuscenes.utils.geometry_utils import transform_matrix
 from pyquaternion import Quaternion
 
-from det3d.datasets.nuscenes import nusc_common as nu_ds
-from det3d.datasets.utils.create_gt_database import create_groundtruth_database
 from det3d.datasets.waymo import waymo_common as waymo_ds
 
 def _get_available_frames(root, split, use_frames):
@@ -107,15 +105,15 @@ def _fill_infos(root_path, frames, split='train', nsweeps=1):
         infos.append(info)
     return infos
 
-def parse_waymo_info(root_path, split, nsweeps=1):
+def parse_waymo_info(root_path, split, use_frames, nsweeps=1):
 
-    frames = _get_available_frames(root_path, split)
+    frames = _get_available_frames(root_path, split, use_frames)
 
     waymo_infos = _fill_infos(root_path, frames, split, nsweeps)
     
     print(f"sample: {len(waymo_infos)}")
 
-    info_name = "infos_"+split+"_{:02d}sweeps_filter_zero_gt.pkl".format(nsweeps)
+    info_name = f"infos_{split}_{use_frames}.pkl"
     with open(os.path.join(root_path, info_name), "wb") as fout:
         pickle.dump(waymo_infos, fout)
 
@@ -123,7 +121,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="""
                     example:
-                        python tools/waymo_info_parser.py waymo/training train
+                        python tools/waymo_info_parser.py waymo/training train seg
                     """,
 
         formatter_class=argparse.RawTextHelpFormatter
@@ -140,4 +138,4 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
 
-    parse_waymo_info(args.root_path, args.split, args.nsweeps, args.use_frames)
+    parse_waymo_info(args.root_path, args.split, args.use_frames, args.nsweeps)
