@@ -4,6 +4,7 @@ found = spconv_spec is not None
 
 if found:
     from .scn import SpMiddleResNetFHD
+    from .scn3d import TestBackbone
 else:
     print("No spconv, sparse convolution disabled!")
 

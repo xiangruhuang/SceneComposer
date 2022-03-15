@@ -1,20 +1,26 @@
-import pickle
+import copy
 from pathlib import Path
-import os 
+import pickle
 import numpy as np
+from tqdm import tqdm
+
+import argparse, os
+from nuscenes.utils.geometry_utils import transform_matrix
+from pyquaternion import Quaternion
+
+from det3d.datasets.nuscenes import nusc_common as nu_ds
+from det3d.datasets.utils.create_gt_database import create_groundtruth_database
+from det3d.datasets.waymo import waymo_common as waymo_ds
 
 from det3d.core import box_np_ops
 from det3d.datasets.dataset_factory import get_dataset
 from tqdm import tqdm
 
 dataset_name_map = {
-    "NUSC": "NuScenesDataset",
     "WAYMO": "WaymoDataset"
 }
 
-
-def create_groundtruth_database(
-    dataset_class_name,
+def generate_waymo_db(
     data_path,
     split,
     info_path=None,
@@ -25,6 +31,7 @@ def create_groundtruth_database(
     virtual=False,
     **kwargs,
 ):
+    dataset_class_name = "WAYMO"
     pipeline = [
         {
             "type": "LoadPointCloudFromFile",
@@ -33,35 +40,17 @@ def create_groundtruth_database(
         {"type": "LoadPointCloudAnnotations", "with_bbox": True},
     ]
 
-    if "nsweeps" in kwargs:
-        dataset = get_dataset(dataset_class_name)(
-            info_path=info_path,
-            root_path=data_path,
-            pipeline=pipeline,
-            test_mode=True,
-            nsweeps=kwargs["nsweeps"],
-            virtual=virtual
-        )
-        nsweeps = dataset.nsweeps
-    else:
-        dataset = get_dataset(dataset_class_name)(
-            info_path=info_path, root_path=data_path, test_mode=True, pipeline=pipeline
-        )
-        nsweeps = 1
+    dataset = get_dataset(dataset_class_name)(
+        info_path=info_path, root_path=data_path, test_mode=True, pipeline=pipeline
+    )
 
     root_path = Path(data_path)
 
-    if dataset_class_name in ["WAYMO", "NUSC"]: 
+    if dataset_class_name in ["WAYMO"]: 
         if db_path is None:
-            if virtual:
-                db_path = root_path / f"gt_database_{split}_{nsweeps}sweeps_withvelo_virtual"
-            else:
-                db_path = root_path / f"gt_database_{split}_{nsweeps}sweeps_withvelo"
+            db_path = root_path / f"gt_database_{split}_1sweeps_withvelo"
         if dbinfo_path is None:
-            if virtual:
-                dbinfo_path = root_path / f"dbinfos_{split}_{nsweeps}sweeps_withvelo_virtual.pkl"
-            else:
-                dbinfo_path = root_path / f"dbinfos_{split}_{nsweeps}sweeps_withvelo.pkl"
+            dbinfo_path = root_path / f"dbinfos_{split}_1sweeps_withvelo.pkl"
     else:
         raise NotImplementedError()
 
@@ -79,10 +68,7 @@ def create_groundtruth_database(
         if "image_idx" in sensor_data["metadata"]:
             image_idx = sensor_data["metadata"]["image_idx"]
 
-        if nsweeps > 1: 
-            points = sensor_data["lidar"]["combined"]
-        else:
-            points = sensor_data["lidar"]["points"]
+        points = sensor_data["lidar"]["points"]
             
         annos = sensor_data["lidar"]["annotations"]
         gt_boxes = annos["boxes"]
@@ -109,11 +95,8 @@ def create_groundtruth_database(
                 unique_ids = unique_ids[mask]
 
         group_dict = {}
-        group_ids = np.full([gt_boxes.shape[0]], -1, dtype=np.int64)
-        if "group_ids" in annos:
-            group_ids = annos["group_ids"]
-        else:
-            group_ids = np.arange(gt_boxes.shape[0], dtype=np.int64)
+        # why group ids
+        group_ids = np.arange(gt_boxes.shape[0], dtype=np.int64)
         difficulty = np.zeros(gt_boxes.shape[0], dtype=np.int32)
         if "difficulty" in annos:
             difficulty = annos["difficulty"]
@@ -169,8 +152,6 @@ def create_groundtruth_database(
                     group_dict[local_group_id] = group_counter
                     group_counter += 1
                 db_info["group_id"] = group_dict[local_group_id]
-                if "score" in annos:
-                    db_info["score"] = annos["score"][i]
                 if names[i] in all_db_infos:
                     all_db_infos[names[i]].append(db_info)
                 else:
@@ -182,3 +163,30 @@ def create_groundtruth_database(
 
     with open(dbinfo_path, "wb") as f:
         pickle.dump(all_db_infos, f)
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="""
+                    example:
+                        python tools/waymo_info_parser.py waymo/training train
+                    """,
+
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument('root_path', type=str)
+    parser.add_argument('split', type=str)
+
+    args = parser.parse_args()
+
+    return args
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    nsweeps = 1
+    info_path = Path(args.root_path) / f"infos_{args.split}_{nsweeps:02d}sweeps_filter_zero_gt.pkl"
+    generate_waymo_db(
+        args.root_path, args.split, info_path,
+        used_classes=['VEHICLE', 'CYCLIST', 'PEDESTRIAN'],
+        nsweeps=1
+    )

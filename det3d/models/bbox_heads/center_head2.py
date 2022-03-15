@@ -173,7 +173,6 @@ class CenterHead2(nn.Module):
         dataset='nuscenes',
         consrv_weight=0,
         weight=0.25,
-        consrv_weight=0,
         code_weights=[],
         common_heads=dict(),
         logger=None,

@@ -264,7 +264,7 @@ def main():
     if not os.path.exists(args.tfrecord_names):
         with open(args.tfrecord_names, 'w') as fout:
             for tfrecord_file in tfrecord_files:
-                fout.write(tfrecord_file+'\n')
+                fout.write(tfrecord_file.split('/')[-1]+'\n')
     
     num_sequences = len(tfrecord_files)
     with Pool(args.num_processes) as pool: # change according to your cpu

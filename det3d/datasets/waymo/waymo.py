@@ -31,12 +31,14 @@ class WaymoDataset(PointCloudDataset):
         nsweeps=1,
         load_interval=1,
         repeat=1,
+        use_frames='all',
         **kwargs,
     ):
         self.load_interval = load_interval 
         self.sample = sample
         self.nsweeps = nsweeps
         self.repeat = repeat
+        self.use_frames = use_frames
         print("Using {} sweeps".format(nsweeps))
         super(WaymoDataset, self).__init__(
             root_path, info_path, pipeline, test_mode=test_mode, class_names=class_names
@@ -53,6 +55,8 @@ class WaymoDataset(PointCloudDataset):
 
         with open(self._info_path, "rb") as f:
             _waymo_infos_all = pickle.load(f)
+        if self.use_frames == 'seg':
+            _waymo_infos_all = [info for info in _waymo_infos_all if info['seg_path'] is not None]
 
         self._waymo_infos = _waymo_infos_all[::self.load_interval]
         if self.repeat > 1:
