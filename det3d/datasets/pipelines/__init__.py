@@ -31,6 +31,7 @@ __all__ = [
     "GTAug",
     "ReplaceAug",
     "SceneAug",
+    "SemanticAug",
     "SeparateForeground",
     "ComputeVisibility",
     "ComputeOccupancy",

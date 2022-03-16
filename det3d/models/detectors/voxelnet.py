@@ -108,7 +108,7 @@ class VoxelNet(SingleStageDetector):
                              gt_boxes[:, 3:6],
                              gt_boxes[:, -1],
                              axis=2)
-            vis.boxes('boxes', gt_corners, cls)
+            #vis.boxes('boxes', gt_corners, cls)
 
             # compute visualizer setting
             camera_center = (points.max(0)[0][:3] + points.min(0)[0][:3]).detach().cpu()/2.0

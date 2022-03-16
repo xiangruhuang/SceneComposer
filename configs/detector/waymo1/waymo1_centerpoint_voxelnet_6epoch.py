@@ -5,7 +5,7 @@ from det3d.utils.config_tool import get_downsample_factor
 from configs import augmentations
 
 tasks = [
-    dict(num_class=1, class_names=['VEHICLE']),
+    dict(num_class=3, class_names=['VEHICLE', 'PEDESTRIAN', 'CYCLIST']),
 ]
 
 class_names = list(itertools.chain(*[t["class_names"] for t in tasks]))
@@ -17,7 +17,7 @@ target_assigner = dict(
 
 # model settings
 model = dict(
-    type="VoxelNet",
+    type="CenterNet",
     pretrained=None,
     reader=dict(
         type="VoxelFeatureExtractorV3",
@@ -32,21 +32,18 @@ model = dict(
         ds_num_filters=[128, 256],
         us_layer_strides=[1, 2],
         us_num_filters=[256, 256],
-        num_input_features=258,
+        num_input_features=256,
         logger=logging.getLogger("RPN"),
     ),
     bbox_head=dict(
-        type="CenterHead2",
+        type="CenterHead",
         in_channels=sum([256, 256]),
         tasks=tasks,
         dataset='waymo',
-        consrv_weight=0.01,
         weight=2,
-        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0],
-        common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
+        code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        common_heads={'reg': (2, 2), 'height': (1, 2), 'dim':(3, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
-    visualize=False,
-    render=True,
 )
 
 assigner = dict(
@@ -54,7 +51,7 @@ assigner = dict(
     out_size_factor=get_downsample_factor(model),
     dense_reg=1,
     gaussian_overlap=0.1,
-    max_objs=500*10,
+    max_objs=500,
     min_radius=2,
 )
 
@@ -71,22 +68,30 @@ test_cfg = dict(
         nms_post_max_size=500,
         nms_iou_threshold=0.7,
     ),
-    score_threshold=0.4,
+    score_threshold=0.1,
     pc_range=[-75.2, -75.2],
     out_size_factor=get_downsample_factor(model),
     voxel_size=[0.1, 0.1],
 )
 
+semantic_cfg = dict(
+    info_path='data/Waymo/dbinfos_train_1_seg.pkl',
+    num_sample=dict(
+        VEHICLE=1,
+        PEDESTRIAN=40,
+        CYCLIST=10,
+    ),
+    ratio=1.5,
+)
 
 # dataset settings
 dataset_type = "WaymoDataset"
 nsweeps = 1
 data_root = "data/Waymo"
-data_split = "train"
 
 train_preprocessor = dict(
     mode="train",
-    shuffle_points=True,
+    shuffle_points=False,
     global_rot_noise=[-0.78539816, 0.78539816],
     global_scale_noise=[0.95, 1.05],
     db_sampler=None,
@@ -94,75 +99,43 @@ train_preprocessor = dict(
 )
 
 val_preprocessor = dict(
-    mode="train",
+    mode="val",
     shuffle_points=False,
-    class_names=class_names,
 )
 
 voxel_generator = dict(
     range=[-75.2, -75.2, -2, 75.2, 75.2, 4],
     voxel_size=[0.1, 0.1, 0.15],
     max_points_in_voxel=5,
-    max_voxel_num=[150000, 200000],
+    max_voxel_num=150000,
 )
 
 train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
-    dict(type="LoadPointCloudAnnotations", with_bbox=True),
+    dict(type="LoadPointCloudAnnotations", with_bbox=True, with_seg=True),
     dict(type="Preprocess", cfg=train_preprocessor),
-    dict(type="ComputeGroundPlaneMask", threshold=0.75),
-    dict(type="SceneAug",
-         split=data_split,
-         cfg=dict(root_path=data_root,
-                  nsweeps=200,
-                  class_names=class_names,
-                  compress_static=True),
-    ),
+    dict(type="SemanticAug", cfg=semantic_cfg),
     augmentations.affine_aug(),
-    dict(type="ComputeVisibility",
-         cfg=dict(
-             voxel_size=voxel_generator["voxel_size"],
-             pc_range=voxel_generator["range"],
-             out_size_factor=test_cfg["out_size_factor"],
-         ),
-    ),
-    dict(type="SeparateForeground",
-         cfg=dict(mode="train",
-                  return_objects=False,
-                  ignore_empty_boxes=False),
-    ),
-    dict(type="ComputeOccupancy",
-         cfg=dict(
-             voxel_size=voxel_generator["voxel_size"],
-             pc_range=voxel_generator["range"],
-             out_size_factor=test_cfg["out_size_factor"],
-         ),
-    ),
     dict(type="Voxelization", cfg=voxel_generator),
-    dict(type="AssignLabel2", cfg=train_cfg["assigner"]),
+    dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 test_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
     dict(type="LoadPointCloudAnnotations", with_bbox=True),
     dict(type="Preprocess", cfg=val_preprocessor),
-    dict(type="SeparateForeground",
-         cfg=dict(mode="train",
-                  return_objects=False,
-                  ignore_empty_boxes=False),
-    ),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
     dict(type="Reformat"),
 ]
 
-train_anno = f"data/Waymo/infos_{data_split}_01sweeps_filter_zero_gt.pkl"
+train_anno = "data/Waymo/infos_train_1_01sweeps_filter_zero_gt.pkl"
 val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
 data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
+    samples_per_gpu=1,
+    workers_per_gpu=1,
     train=dict(
         type=dataset_type,
         root_path=data_root,
@@ -171,7 +144,8 @@ data = dict(
         nsweeps=nsweeps,
         class_names=class_names,
         pipeline=train_pipeline,
-        load_interval=10,
+        use_frames='seg',
+        with_seg=True,
     ),
     val=dict(
         type=dataset_type,
@@ -217,7 +191,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 20
+total_epochs = 6
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"
