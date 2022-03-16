@@ -46,7 +46,7 @@ model = dict(
         common_heads={'reg': (2, 2), 'height': (1, 2), 'rot':(2, 2)}, # (output_channel, num_conv)
     ),
     visualize=False,
-    render=False,
+    render=True,
 )
 
 assigner = dict(
