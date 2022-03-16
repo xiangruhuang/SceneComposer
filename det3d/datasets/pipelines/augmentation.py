@@ -354,9 +354,10 @@ class SemanticAug(object):
         return locations
 
     def __call__(self, res, info):
+
         points = res["lidar"]["points"]
         num_sample = self.num_sample["PEDESTRIAN"]
-        seg_labels = res["lidar"]["annotations"]["seg_labels"]
+        seg_labels = res["lidar"]["annotations"].pop("seg_labels")
 
         # find marked points
         points = points[:seg_labels.shape[0]]
@@ -368,6 +369,9 @@ class SemanticAug(object):
         road_region = seg_labels[:, 1] > 17
         walkable_points = points[road_region]
         non_walkable_points = points[road_region == False]
+
+        if walkable_points.shape[0] == 0:
+            return res, info
 
         # sample objects and locations to place them
         boxes, point_clouds = self._retrieve_obj(self.objects['PEDESTRIAN'],
@@ -442,7 +446,5 @@ class SemanticAug(object):
             )
 
             res["lidar"]["annotations"] = gt_dict
-        else:
-            res["lidar"]["annotations"].pop("seg_labels")
 
         return res, info

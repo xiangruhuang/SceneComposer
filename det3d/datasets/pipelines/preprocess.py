@@ -107,7 +107,15 @@ class Voxelization(object):
             gt_dict = res["lidar"]["annotations"]
             bv_range = pc_range[[0, 1, 3, 4]]
             mask = prep.filter_gt_box_outside_range(gt_dict["gt_boxes"], bv_range)
-            _dict_select(gt_dict, mask)
+            try:
+                _dict_select(gt_dict, mask)
+            except Exception as e:
+                print('------')
+                print(mask.shape)
+                for key in gt_dict.keys():
+                    print(gt_dict[key].shape)
+                print(e)
+
 
             res["lidar"]["annotations"] = gt_dict
             max_voxels = self.max_voxel_num[0]

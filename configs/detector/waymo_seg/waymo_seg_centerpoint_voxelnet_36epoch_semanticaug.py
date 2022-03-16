@@ -74,6 +74,15 @@ test_cfg = dict(
     voxel_size=[0.1, 0.1],
 )
 
+semantic_cfg = dict(
+    info_path='data/Waymo/dbinfos_train_seg.pkl',
+    num_sample=dict(
+        VEHICLE=1,
+        PEDESTRIAN=60,
+        CYCLIST=10,
+    ),
+    ratio=2.0,
+)
 
 # dataset settings
 dataset_type = "WaymoDataset"
@@ -82,7 +91,7 @@ data_root = "data/Waymo"
 
 train_preprocessor = dict(
     mode="train",
-    shuffle_points=True,
+    shuffle_points=False,
     global_rot_noise=[-0.78539816, 0.78539816],
     global_scale_noise=[0.95, 1.05],
     db_sampler=None,
@@ -103,8 +112,9 @@ voxel_generator = dict(
 
 train_pipeline = [
     dict(type="LoadPointCloudFromFile", dataset=dataset_type),
-    dict(type="LoadPointCloudAnnotations", with_bbox=True),
+    dict(type="LoadPointCloudAnnotations", with_bbox=True, with_seg=True),
     dict(type="Preprocess", cfg=train_preprocessor),
+    dict(type="SemanticAug", cfg=semantic_cfg),
     augmentations.affine_aug(),
     dict(type="Voxelization", cfg=voxel_generator),
     dict(type="AssignLabel", cfg=train_cfg["assigner"]),
@@ -135,6 +145,7 @@ data = dict(
         class_names=class_names,
         pipeline=train_pipeline,
         use_frames='seg',
+        with_seg=True,
     ),
     val=dict(
         type=dataset_type,
@@ -180,7 +191,7 @@ log_config = dict(
 )
 # yapf:enable
 # runtime settings
-total_epochs = 6
+total_epochs = 36
 device_ids = range(8)
 dist_params = dict(backend="nccl", init_method="env://")
 log_level = "INFO"
