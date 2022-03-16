@@ -121,7 +121,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="""
                     example:
-                        python tools/waymo_info_parser.py waymo/training train seg
+                        python tools/waymo_info_parser.py data/Waymo train seg
                     """,
 
         formatter_class=argparse.RawTextHelpFormatter
