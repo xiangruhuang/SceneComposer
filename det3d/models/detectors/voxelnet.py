@@ -60,9 +60,9 @@ class VoxelNet(SingleStageDetector):
                 input_features, data["coors"], data["batch_size"], data["input_shape"]
             )
 
-        visibility = example['visibility'].unsqueeze(1).transpose(-1, -2).to(x.device)
-        occupancy = example['occupancy'].unsqueeze(1).transpose(-1, -2).to(x.device)
-        x = torch.cat([x, visibility, occupancy], dim=1)
+        #visibility = example['visibility'].unsqueeze(1).transpose(-1, -2).to(x.device)
+        #occupancy = example['occupancy'].unsqueeze(1).transpose(-1, -2).to(x.device)
+        #x = torch.cat([x, visibility, occupancy], dim=1)
 
         if self.with_neck:
             x = self.neck(x)
@@ -80,8 +80,6 @@ class VoxelNet(SingleStageDetector):
         for i in range(num_samples):
             token = example['metadata'][i]['token'].split('.')[0]
             seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
-            if seq_id % 5 == 0:
-                continue
 
             visit_time = self.epoch_dict[token]
             self.epoch_dict[token] += 1

@@ -184,27 +184,28 @@ class LoadPointCloudFromFile(object):
 
 @PIPELINES.register_module
 class LoadPointCloudAnnotations(object):
-    def __init__(self, with_bbox=True, **kwargs):
-        pass
+    def __init__(self, with_bbox=True, with_seg=False, **kwargs):
+        self.with_seg = with_seg
+        self.with_bbox = with_bbox
 
     def __call__(self, res, info):
 
-        if res["type"] in ["NuScenesDataset"] and "gt_boxes" in info:
-            gt_boxes = info["gt_boxes"].astype(np.float32)
-            gt_boxes[np.isnan(gt_boxes)] = 0
-            res["lidar"]["annotations"] = {
-                "boxes": gt_boxes,
-                "names": info["gt_names"],
-                "tokens": info["gt_boxes_token"],
-                "velocities": info["gt_boxes_velocity"].astype(np.float32),
-            }
-        elif res["type"] == 'WaymoDataset' and "gt_boxes" in info:
+        if res["type"] == 'WaymoDataset' and "gt_boxes" in info:
             unique_ids = info.get("unique_ids", None)
             res["lidar"]["annotations"] = {
                 "boxes": info["gt_boxes"].astype(np.float32),
                 "names": info["gt_names"],
                 "unique_ids": unique_ids,
             }
+            if self.with_seg:
+                seg_path = info['seg_path']
+                if seg_path is not None:
+                    seg_labels = get_obj(seg_path)["point_labels"]
+                else:
+                    seg_labels = None
+                res["lidar"]["annotations"].update(
+                    dict(seg_labels=seg_labels)
+                )
         else:
             pass 
 
