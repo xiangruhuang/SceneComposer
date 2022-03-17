@@ -69,7 +69,8 @@ class Preprocess(object):
                 dtype=np.int32,
             )
             gt_dict["gt_classes"] = gt_classes
-            gt_dict["seg_labels"] = anno_dict["seg_labels"]
+            if "seg_labels" in anno_dict:
+                gt_dict["seg_labels"] = anno_dict["seg_labels"]
 
             res["lidar"]["annotations"] = gt_dict
 
