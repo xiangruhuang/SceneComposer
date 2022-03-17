@@ -11,7 +11,7 @@ from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import (
     is_line_segment_intersection_jit,
     points_in_convex_polygon_3d_jit,
-    points_in_convex_polygon_jit,
+    points_in_convex_polygon,
 )
 import copy
 
@@ -118,7 +118,7 @@ def filter_gt_box_outside_range(gt_boxes, limit_range):
     bounding_box = box_np_ops.minmax_to_corner_2d(
         np.asarray(limit_range)[np.newaxis, ...]
     )
-    ret = points_in_convex_polygon_jit(gt_boxes_bv.reshape(-1, 2), bounding_box)
+    ret = points_in_convex_polygon(gt_boxes_bv.reshape(-1, 2), bounding_box)
     return np.any(ret.reshape(-1, 4), axis=1)
 
 
