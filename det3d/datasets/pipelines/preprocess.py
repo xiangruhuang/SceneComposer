@@ -114,7 +114,7 @@ class Voxelization(object):
                 print('------')
                 print(mask.shape)
                 for key in gt_dict.keys():
-                    print(gt_dict[key].shape)
+                    print(key, gt_dict[key].shape)
                 print(e)
 
 
