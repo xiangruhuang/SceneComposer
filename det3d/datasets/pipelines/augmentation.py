@@ -384,16 +384,17 @@ class SemanticAug(object):
             
         return locations
 
-    def _subsample_by_dist(self, boxes, point_clouds, key):
+    def _subsample_by_dist(self, boxes, point_clouds, classes):
         dists = np.linalg.norm(boxes[:, :3], axis=-1, ord=2)
         for i, pc in enumerate(point_clouds):
             dist = int(np.round(dists[i]))
+            key = self.class_names[classes[i]-1]
             npoints = self.distance_to_npoints[key][dist]
             if pc.shape[0] > npoints:
                 rand_idx = np.random.permutation(pc.shape[0])[:npoints]
                 point_clouds[i] = point_clouds[i][rand_idx]
             
-        return boxes, point_clouds
+        return boxes, point_clouds, classes
 
     def _update_objects(self, boxes, point_clouds, locations):
         """
@@ -425,7 +426,7 @@ class SemanticAug(object):
 
         return boxes, point_clouds
 
-    def _reject_by_collision(self, boxes, point_clouds):
+    def _reject_by_collision(self, boxes, point_clouds, classes):
         num_boxes = boxes.shape[0]
 
         # bird eye view box corners
@@ -440,16 +441,18 @@ class SemanticAug(object):
 
         # find valid boxes (greedy)
         visited = np.zeros(boxes_bv.shape[0], dtype=bool)
-        sampled_boxes, sampled_point_clouds = [], []
+        sampled_boxes, sampled_point_clouds, sampled_classes = [], [], []
         for i in range(num_boxes):
             if not visited[i]:
                 visited[i] = True
                 sampled_boxes.append(boxes[i])
                 sampled_point_clouds.append(point_clouds[i])
+                sampled_classes.append(classes[i])
                 visited[coll_mat[i, :]] = True
         sampled_boxes = np.array(sampled_boxes).reshape(-1, 9)
+        sampled_classes = np.array(sampled_classes).reshape(-1).astype(np.int32)
         
-        return sampled_boxes, sampled_point_clouds
+        return sampled_boxes, sampled_point_clouds, sampled_classes
 
     def _keep_interacting_objects(self, boxes, point_clouds, non_walkable_points):
 
@@ -484,11 +487,28 @@ class SemanticAug(object):
 
         return valid_boxes, valid_point_clouds
 
+    def sample_class(self, non_walkable_points, walkable_points, key, num_sample):
+
+        # sample objects and locations to place them
+        boxes, point_clouds = self._retrieve_obj(self.objects[key],
+                                                 num_sample)
+        locations = self._sample_locations(walkable_points, num_sample)
+
+        # orient and update boxes and points based on locations
+        boxes, point_clouds = self._update_objects(boxes, point_clouds, locations)
+
+        # filter objects 
+        boxes, point_clouds = self._keep_interacting_objects(
+                                  boxes, point_clouds,
+                                  non_walkable_points)
+
+        classes = np.array([self.class_names.index(key) + 1 for i in range(boxes.shape[0])], dtype=np.int32)
+
+        return boxes, point_clouds, classes
+
     def __call__(self, res, info):
 
-        self.key = "PEDESTRIAN"
         points = res["lidar"]["points"]
-        num_sample = self.num_sample[self.key]
         seg_labels = res["lidar"]["annotations"].pop("seg_labels")
         
         # find marked points
@@ -496,33 +516,37 @@ class SemanticAug(object):
         mask = (seg_labels != 0).any(-1)
         points = points[mask]
         seg_labels = seg_labels[mask]
-
+        
         # find walkable regions
         road_region = seg_labels[:, 1] > 17
         walkable_points = points[road_region]
         non_walkable_points = points[road_region == False]
-
+        
         if walkable_points.shape[0] == 0:
             return res, info
 
-        # sample objects and locations to place them
-        boxes, point_clouds = self._retrieve_obj(self.objects[self.key],
-                                                 num_sample)
-        sampled_objects = (boxes, point_clouds)
-        locations = self._sample_locations(walkable_points, num_sample)
+        sampled_boxes, sampled_point_clouds, sampled_classes = [], [], []
 
-        # orient and update boxes and points based on locations
-        sampled_objects = self._update_objects(*sampled_objects, locations)
+        for key, num_sample in self.num_sample.items():
+            if num_sample == 0:
+                continue
+            sampled_class_objects = self.sample_class(non_walkable_points, walkable_points, key, num_sample)
+            
+            sampled_boxes.append(sampled_class_objects[0])
+            sampled_point_clouds += sampled_class_objects[1]
+            sampled_classes.append(sampled_class_objects[2])
+            
+        sampled_boxes = np.concatenate(sampled_boxes, axis=0)
+        sampled_classes = np.concatenate(sampled_classes, axis=0)
 
-        # filter objects 
-        sampled_objects = self._keep_interacting_objects(*sampled_objects, non_walkable_points)
-        
+        sampled_objects = (sampled_boxes, sampled_point_clouds, sampled_classes)
+
         sampled_objects = self._reject_by_collision(*sampled_objects)
-        
-        sampled_objects = self._subsample_by_dist(*sampled_objects, self.key)
+            
+        sampled_objects = self._subsample_by_dist(*sampled_objects)
 
         # update res
-        sampled_boxes, sampled_point_clouds = sampled_objects
+        sampled_boxes, sampled_point_clouds, sampled_classes = sampled_objects
         num_sampled = len(sampled_point_clouds)
         if num_sampled > 0:
             for i, pc in enumerate(sampled_point_clouds):
@@ -537,10 +561,9 @@ class SemanticAug(object):
             gt_boxes = gt_dict["gt_boxes"]
             gt_names = gt_dict["gt_names"]
             gt_classes = gt_dict["gt_classes"]
-            
-            sampled_names = np.array([self.key for i in range(num_sampled)]
+
+            sampled_names = np.array([self.class_names[cls-1] for cls in sampled_classes]
                                     ).astype(str)
-            sampled_classes = np.array([self.class_names.index(name) + 1 for name in sampled_names], dtype=np.int32)
 
             gt_boxes = np.concatenate([gt_boxes, sampled_boxes], axis=0)
             gt_names = np.concatenate([gt_names, sampled_names], axis=0)

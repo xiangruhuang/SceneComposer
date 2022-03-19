@@ -114,28 +114,34 @@ class VoxelNet(SingleStageDetector):
             camera_center = (points.max(0)[0][:3] + points.min(0)[0][:3]).detach().cpu()/2.0
             token = example['metadata'][i]['token'].split('.')[0]
             seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
-            vis.look_at(camera_center, distance=200)
+            vis.look_at(camera_center, distance=50)
 
-            if self.visualize:
+            vis.pointcloud('points', example['points'][0][:, :3].detach().cpu())
+            with open('points.pkl', 'wb') as fout:
+                pickle.dump(example['points'][0][:, :3].detach().cpu(), fout)
+            with open('boxes.pkl', 'wb') as fout:
+                pickle.dump(gt_boxes, fout)
+            with open('classes.pkl', 'wb') as fout:
+                pickle.dump(cls, fout)
+            vis.boxes_from_attr('boxes', gt_boxes, cls-1)
+            # draw heat map
+            #vis.heatmap('hm', example['hm'][0][i, 0].detach().cpu())
+            if self.render:
                 vis.pointcloud('points', example['points'][0][:, :3].detach().cpu())
                 vis.boxes_from_attr('boxes', gt_boxes, cls-1)
-                import ipdb; ipdb.set_trace()
-                vis.show()
-            # draw heat map
-            vis.heatmap('hm', example['hm'][0][i, 0].detach().cpu())
-            if self.render:
                 folder = f'figures/heatmap/seq_{seq_id:03d}_frame_{frame_id:03d}'
                 os.makedirs(folder, exist_ok=True)
                 path = f'{folder}/{visit_time:05d}.png'
+                vis.look_at(camera_center, distance=20)
                 vis.screenshot(path)
-                img1 = np.array(Image.open(path))
-                pred_hm = preds[0]['hm'][i, 0].detach().cpu()
-                pred_hm = self.bbox_head._sigmoid(pred_hm)
-                vis.heatmap('hm', pred_hm)
-                vis.screenshot(path)
-                img2 = np.array(Image.open(path))
-                img = np.concatenate([img1, img2], axis=0)
-                Image.fromarray(img).save(path)
+                #img1 = np.array(Image.open(path))
+                #pred_hm = preds[0]['hm'][i, 0].detach().cpu()
+                #pred_hm = self.bbox_head._sigmoid(pred_hm)
+                #vis.heatmap('hm', pred_hm)
+                #vis.screenshot(path)
+                #img2 = np.array(Image.open(path))
+                #img = np.concatenate([img1, img2], axis=0)
+                #Image.fromarray(img).save(path)
 
     def forward(self, example, return_loss=True, **kwargs):
         x, _ = self.extract_feat(example)
