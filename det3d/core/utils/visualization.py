@@ -7,6 +7,7 @@ class Visualizer:
                  voxel_size=None,
                  pc_range=None,
                  size_factor=None,
+                 ground_plane=False,
                  radius=2e-4):
         self.voxel_size = voxel_size
         self.pc_range = pc_range
@@ -14,7 +15,8 @@ class Visualizer:
         self.radius = radius
         ps.set_up_dir('z_up')
         ps.init()
-        ps.set_ground_plane_mode('none')
+        if not ground_plane:
+            ps.set_ground_plane_mode('none')
             
         self.logs = []
 
@@ -87,7 +89,17 @@ class Visualizer:
                       attr[:, 3:6],
                       attr[:, -1],
                       axis=2)
-        self.boxes(name, corners, labels, **kwargs)
+        if 'with_ori' in kwargs:
+            with_ori = kwargs.pop('with_ori')
+        else:
+            with_ori = False
+        ps_box = self.boxes(name, corners, labels, **kwargs)
+        if with_ori:
+            ori = attr[:, -1]
+            sint, cost = np.sin(ori), np.cos(ori)
+            arrow = np.stack([sint, cost, np.zeros_like(cost)], axis=-1)[:, np.newaxis, :].repeat(8, 1)
+            ps_box.add_vector_quantity('orientation', arrow.reshape(-1, 3), enabled=True)
+        
 
     def boxes(self, name, corners, labels=None, **kwargs):
         """
@@ -115,6 +127,7 @@ class Visualizer:
                 labels = np.repeat(labels[:, np.newaxis], 8, axis=-1).reshape(-1)
                 ps_box.add_color_quantity('class', colors[labels],
                                           defined_on='nodes', enabled=True)
+
         return ps_box
 
     def wireframe(self, name, heatmap):

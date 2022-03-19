@@ -1,6 +1,7 @@
 import numpy as np
 import pickle
 import glob, os
+from collections import defaultdict
 
 from det3d.core.bbox import box_np_ops
 from det3d.core.bbox.geometry import (
@@ -319,8 +320,37 @@ class SemanticAug(object):
         self.root_path = cfg.get("root_path", 'data/Waymo')
         self.num_sample = cfg.get("num_sample", None)
         self.ratio = cfg.get("ratio", 1.5)
+        self.class_names = cfg.class_names
+
         with open(cfg.info_path, "rb") as fin:
             self.objects = pickle.load(fin)
+
+        self.distance_to_npoints = {}
+        for key, obj in self.objects.items():
+            self.objects[key] = [o for o in obj if o['num_points_in_gt'] >= 5]
+            dists = [np.linalg.norm(o['box3d_lidar'][:3]) for o in obj]
+            num_points = [o['num_points_in_gt'] for o in obj]
+
+            num_points_by_dist = {i: [] for i in range(0, 100)}
+            for d, n in zip(dists, num_points):
+                d_int = int(np.round(d))
+                num_points_by_dist[d_int].append(n)
+            last_npoints = 1000000
+            distance_to_npoints_this = {}
+            for d in range(0, 100):
+                many = []
+                for di in range(max(d-5, 0), min(d+5, 100)):
+                    many += num_points_by_dist[di]
+                if len(many) == 0:
+                    npoints = last_npoints
+                else:
+                    npoints = np.mean(many)
+                    if (npoints > last_npoints) or (np.isnan(npoints)):
+                        npoints = last_npoints
+                    else:
+                        last_npoints = npoints
+                distance_to_npoints_this[d] = int(npoints)
+            self.distance_to_npoints[key] = distance_to_npoints_this
 
     def _retrieve_obj(self, objects, num_sample=1):
         num_objects = len(objects)
@@ -336,6 +366,7 @@ class SemanticAug(object):
             num_points = objects[index]["num_points_in_gt"]
             boxes.append(box)
             point_clouds.append(points)
+            assert points.shape[0] == num_points
         boxes = np.stack(boxes, axis=0)
 
         return boxes, point_clouds
@@ -353,34 +384,76 @@ class SemanticAug(object):
             
         return locations
 
-    def __call__(self, res, info):
+    def _subsample_by_dist(self, boxes, point_clouds, key):
+        dists = np.linalg.norm(boxes[:, :3], axis=-1, ord=2)
+        for i, pc in enumerate(point_clouds):
+            dist = int(np.round(dists[i]))
+            npoints = self.distance_to_npoints[key][dist]
+            if pc.shape[0] > npoints:
+                rand_idx = np.random.permutation(pc.shape[0])[:npoints]
+                point_clouds[i] = point_clouds[i][rand_idx]
+            
+        return boxes, point_clouds
 
-        points = res["lidar"]["points"]
-        num_sample = self.num_sample["PEDESTRIAN"]
-        seg_labels = res["lidar"]["annotations"].pop("seg_labels")
+    def _update_objects(self, boxes, point_clouds, locations):
+        """
+        Args:
+            boxes ([N, 9])
+            point_clouds list([N, 3])
+            locations [N, 3]
 
-        # find marked points
-        points = points[:seg_labels.shape[0]]
-        mask = (seg_labels != 0).any(-1)
-        points = points[mask]
-        seg_labels = seg_labels[mask]
+        Returns:
+            boxes (rotated)
+            point_clouds (rotated)
+        """
+        
+        box_x, box_y = boxes[:, :2].T
+        box_theta = np.arctan2(box_y, box_x)
+        loc_x, loc_y = locations[:, :2].T
+        loc_theta = np.arctan2(loc_y, loc_x)
+        rot_theta = loc_theta - box_theta
+        
+        boxes[:, -1] -= rot_theta
+        rot_sint, rot_cost = np.sin(rot_theta), np.cos(rot_theta)
+        # counterclockwise
+        R = np.stack([rot_cost, -rot_sint, rot_sint, rot_cost], axis=-1).reshape(-1, 2, 2)
+        for i in range(len(point_clouds)):
+            point_clouds[i][:, :2] = point_clouds[i][:, :2] @ R[i].T
 
-        # find walkable regions
-        road_region = seg_labels[:, 1] > 17
-        walkable_points = points[road_region]
-        non_walkable_points = points[road_region == False]
-
-        if walkable_points.shape[0] == 0:
-            return res, info
-
-        # sample objects and locations to place them
-        boxes, point_clouds = self._retrieve_obj(self.objects['PEDESTRIAN'],
-                                                 num_sample)
-        locations = self._sample_locations(walkable_points, num_sample)
-
-        # create fake boxes that are larger by a ratio r
         boxes[:, :3] = locations
         boxes[:, 2] += boxes[:, 5] / 2
+
+        return boxes, point_clouds
+
+    def _reject_by_collision(self, boxes, point_clouds):
+        num_boxes = boxes.shape[0]
+
+        # bird eye view box corners
+        boxes_bv = box_np_ops.center_to_corner_box2d(
+                       boxes[:, :2], boxes[:, 3:5], boxes[:, -1]
+                   )
+
+        # compute collision matrix
+        coll_mat = prep.box_collision_test(boxes_bv, boxes_bv)
+        diag = np.arange(boxes_bv.shape[0])
+        coll_mat[diag, diag] = False
+
+        # find valid boxes (greedy)
+        visited = np.zeros(boxes_bv.shape[0], dtype=bool)
+        sampled_boxes, sampled_point_clouds = [], []
+        for i in range(num_boxes):
+            if not visited[i]:
+                visited[i] = True
+                sampled_boxes.append(boxes[i])
+                sampled_point_clouds.append(point_clouds[i])
+                visited[coll_mat[i, :]] = True
+        sampled_boxes = np.array(sampled_boxes).reshape(-1, 9)
+        
+        return sampled_boxes, sampled_point_clouds
+
+    def _keep_interacting_objects(self, boxes, point_clouds, non_walkable_points):
+
+        # create fake boxes that are larger by a ratio r
         fake_boxes = boxes.copy()
         fake_boxes[:, 3:6] *= self.ratio
         boxes_all = np.concatenate([boxes, fake_boxes], axis=0)
@@ -401,26 +474,60 @@ class SemanticAug(object):
                                 box_overlap[boxes.shape[0]:]
                             )[0]
         
-        # check validity
+        # keep only interacting objects
         valid_point_clouds, valid_boxes = [], []
         for idx in obj_valid_indices:
             sampled_points_this = point_clouds[idx]
-            sampled_points_this[:, :3] += boxes[idx, :3]
             valid_point_clouds.append(sampled_points_this)
             valid_boxes.append(boxes[idx])
+        valid_boxes = np.array(valid_boxes).reshape(-1, 9)
 
-        num_sampled = len(valid_point_clouds)
+        return valid_boxes, valid_point_clouds
+
+    def __call__(self, res, info):
+
+        self.key = "PEDESTRIAN"
+        points = res["lidar"]["points"]
+        num_sample = self.num_sample[self.key]
+        seg_labels = res["lidar"]["annotations"].pop("seg_labels")
+        
+        # find marked points
+        points = points[:seg_labels.shape[0]]
+        mask = (seg_labels != 0).any(-1)
+        points = points[mask]
+        seg_labels = seg_labels[mask]
+
+        # find walkable regions
+        road_region = seg_labels[:, 1] > 17
+        walkable_points = points[road_region]
+        non_walkable_points = points[road_region == False]
+
+        if walkable_points.shape[0] == 0:
+            return res, info
+
+        # sample objects and locations to place them
+        boxes, point_clouds = self._retrieve_obj(self.objects[self.key],
+                                                 num_sample)
+        sampled_objects = (boxes, point_clouds)
+        locations = self._sample_locations(walkable_points, num_sample)
+
+        # orient and update boxes and points based on locations
+        sampled_objects = self._update_objects(*sampled_objects, locations)
+
+        # filter objects 
+        sampled_objects = self._keep_interacting_objects(*sampled_objects, non_walkable_points)
+        
+        sampled_objects = self._reject_by_collision(*sampled_objects)
+        
+        sampled_objects = self._subsample_by_dist(*sampled_objects, self.key)
+
+        # update res
+        sampled_boxes, sampled_point_clouds = sampled_objects
+        num_sampled = len(sampled_point_clouds)
         if num_sampled > 0:
-            sampled_points = np.concatenate(valid_point_clouds, axis=0)
-            sampled_boxes = np.stack(valid_boxes, axis=0)
-
-            #from det3d.core import Visualizer
-            #vis = Visualizer()
-            #vis.pointcloud('w-points', walkable_points[:, :3])
-            #vis.pointcloud('points', non_walkable_points[:, :3])
-            #vis.boxes_from_attr('sampled_boxes', sampled_boxes, np.ones(sampled_boxes.shape[0]).astype(np.int32))
-
-            #vis.pointcloud('sampled', sampled_points[:, :3])
+            for i, pc in enumerate(sampled_point_clouds):
+                sampled_point_clouds[i][:, :3] += sampled_boxes[i, :3]
+            sampled_points = np.concatenate(sampled_point_clouds, axis=0)
 
             res["lidar"]["points"] = np.concatenate([
                                          res["lidar"]["points"],
@@ -430,15 +537,15 @@ class SemanticAug(object):
             gt_boxes = gt_dict["gt_boxes"]
             gt_names = gt_dict["gt_names"]
             gt_classes = gt_dict["gt_classes"]
-
-            sampled_names = np.array(["PEDESTRIAN" for i in range(num_sampled)]
+            
+            sampled_names = np.array([self.key for i in range(num_sampled)]
                                     ).astype(str)
-            sampled_classes = np.ones(num_sampled).astype(np.int32) + 1
+            sampled_classes = np.array([self.class_names.index(name) + 1 for name in sampled_names], dtype=np.int32)
 
             gt_boxes = np.concatenate([gt_boxes, sampled_boxes], axis=0)
             gt_names = np.concatenate([gt_names, sampled_names], axis=0)
             gt_classes = np.concatenate([gt_classes, sampled_classes], axis=0)
-
+            
             gt_dict = dict(
                 gt_boxes=gt_boxes,
                 gt_names=gt_names,

@@ -116,6 +116,11 @@ class VoxelNet(SingleStageDetector):
             seq_id, frame_id = int(token.split('_')[1]), int(token.split('_')[3])
             vis.look_at(camera_center, distance=200)
 
+            if self.visualize:
+                vis.pointcloud('points', example['points'][0][:, :3].detach().cpu())
+                vis.boxes_from_attr('boxes', gt_boxes, cls-1)
+                import ipdb; ipdb.set_trace()
+                vis.show()
             # draw heat map
             vis.heatmap('hm', example['hm'][0][i, 0].detach().cpu())
             if self.render:

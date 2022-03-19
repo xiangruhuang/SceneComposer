@@ -75,7 +75,7 @@ test_cfg = dict(
 )
 
 semantic_cfg = dict(
-    info_path='data/Waymo/dbinfos_train_seg.pkl',
+    info_path='data/Waymo/dbinfos_train_1_seg.pkl',
     num_sample=dict(
         VEHICLE=1,
         PEDESTRIAN=60,
@@ -130,7 +130,7 @@ test_pipeline = [
     dict(type="Reformat"),
 ]
 
-train_anno = "data/Waymo/infos_train_seg.pkl"
+train_anno = "data/Waymo/infos_train_1_seg.pkl"
 val_anno = "data/Waymo/infos_val_01sweeps_filter_zero_gt.pkl"
 test_anno = None
 
