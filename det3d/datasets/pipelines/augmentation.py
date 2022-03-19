@@ -341,11 +341,14 @@ class SemanticAug(object):
                 many = []
                 for di in range(max(d-5, 0), min(d+5, 100)):
                     many += num_points_by_dist[di]
-                npoints = np.mean(many)
-                if (npoints > last_npoints) or (np.isnan(npoints)):
+                if len(many) == 0:
                     npoints = last_npoints
                 else:
-                    last_npoints = npoints
+                    npoints = np.mean(many)
+                    if (npoints > last_npoints) or (np.isnan(npoints)):
+                        npoints = last_npoints
+                    else:
+                        last_npoints = npoints
                 distance_to_npoints_this[d] = int(npoints)
             self.distance_to_npoints[key] = distance_to_npoints_this
 

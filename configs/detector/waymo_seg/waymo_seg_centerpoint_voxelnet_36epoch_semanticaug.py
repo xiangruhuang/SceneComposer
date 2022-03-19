@@ -81,6 +81,7 @@ semantic_cfg = dict(
         PEDESTRIAN=60,
         CYCLIST=10,
     ),
+    class_names=["VEHICLE", "PEDESTRIAN", "CYCLIST"],
     ratio=2.0,
 )
 
