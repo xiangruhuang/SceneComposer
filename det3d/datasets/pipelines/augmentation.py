@@ -319,6 +319,7 @@ class SemanticAug(object):
         self.cfg = cfg
         self.root_path = cfg.get("root_path", 'data/Waymo')
         self.num_sample = cfg.get("num_sample", None)
+        self.max_num_sample = cfg.get("max_num_sample", None)
         self.ratio = cfg.get("ratio", 1.5)
         self.class_names = cfg.class_names
 
@@ -501,6 +502,10 @@ class SemanticAug(object):
         boxes, point_clouds = self._keep_interacting_objects(
                                   boxes, point_clouds,
                                   non_walkable_points)
+
+        if boxes.shape[0] > self.max_num_sample[key]:
+            boxes = boxes[:self.max_num_sample[key]]
+            point_clouds = point_clouds[:self.max_num_sample[key]]
 
         classes = np.array([self.class_names.index(key) + 1 for i in range(boxes.shape[0])], dtype=np.int32)
 
