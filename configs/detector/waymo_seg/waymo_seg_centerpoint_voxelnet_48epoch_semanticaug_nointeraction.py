@@ -78,16 +78,11 @@ semantic_cfg = dict(
     info_path='data/Waymo/dbinfos_train_seg.pkl',
     num_sample=dict(
         VEHICLE=0,
-        PEDESTRIAN=100,
-        CYCLIST=100,
-    ),
-    max_num_sample=dict(
-        VEHICLE=0,
         PEDESTRIAN=15,
         CYCLIST=10,
     ),
     class_names=["VEHICLE", "PEDESTRIAN", "CYCLIST"],
-    ratio=2.0,
+    ratio=30.0,
 )
 
 # dataset settings
