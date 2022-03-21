@@ -3,7 +3,7 @@ import numpy as np
 from det3d.core.bbox import box_np_ops
 from det3d.core.utils.center_utils import (
     gaussian_radius,
-    draw_umich_gaussian 
+    draw_umich_gaussian as draw_gaussian
 )
 from ..registry import PIPELINES
 
@@ -32,6 +32,173 @@ def merge_multi_group_label(gt_classes, num_classes_by_task):
 
     return flatten(gt_classes)
 
+def organize_tasks(gt_dict, class_names_by_task):
+    task_masks = []
+    offset = 0
+    for class_name in class_names_by_task:
+        task_masks.append(
+            [
+                np.where(
+                    gt_dict["gt_classes"] == class_name.index(i) + 1 + offset
+                )
+                for i in class_name
+            ]
+        )
+        offset += len(class_name)
+
+    task_boxes = []
+    task_classes = []
+    task_names = []
+    offset2 = 0
+    for idx, mask in enumerate(task_masks):
+        task_box = []
+        task_class = []
+        task_name = []
+        for m in mask:
+            task_box.append(gt_dict["gt_boxes"][m])
+            task_class.append(gt_dict["gt_classes"][m] - offset2)
+            task_name.append(gt_dict["gt_names"][m])
+        task_boxes.append(np.concatenate(task_box, axis=0))
+        task_classes.append(np.concatenate(task_class))
+        task_names.append(np.concatenate(task_name))
+        offset2 += len(mask)
+
+    return task_boxes, task_classes, task_names
+
+def gaussian_radius(dims, min_overlap=0.5):
+    l, w = dims.T
+
+    a1  = 1
+    b1  = (l + w)
+    c1  = w * l * (1 - min_overlap) / (1 + min_overlap)
+    sq1 = np.sqrt(b1 ** 2 - 4 * a1 * c1)
+    r1  = (b1 + sq1) / 2
+
+    a2  = 4
+    b2  = 2 * (l + w)
+    c2  = (1 - min_overlap) * w * l
+    sq2 = np.sqrt(b2 ** 2 - 4 * a2 * c2)
+    r2  = (b2 + sq2) / 2
+
+    a3  = 4 * min_overlap
+    b3  = -2 * min_overlap * (l + w)
+    c3  = (min_overlap - 1) * w * l
+    sq3 = np.sqrt(b3 ** 2 - 4 * a3 * c3)
+    r3  = (b3 + sq3) / 2
+
+    return np.minimum(r1, r2, r3)
+
+class HeatmapGenerator(object):
+    def __init__(self, cfg, **kwargs):
+        self.out_size_factor = cfg.out_size_factor
+        self.gaussian_overlap = cfg.gaussian_overlap
+        self._min_radius = cfg.min_radius
+
+    def scatter_points_on_hm(self, points, voxel_cfg):
+        # size of heatmap and voxel
+        grid_size = voxel_cfg["shape"]
+        pc_range = voxel_cfg["range"]
+        voxel_size = voxel_cfg["size"]
+        feature_map_size = grid_size[:2] // self.out_size_factor
+        effective_voxel_size = voxel_size[:2] * self.out_size_factor
+        
+        # compute coordinates of box centers
+        coors = (points[:, :2] - pc_range[:2]) / effective_voxel_size
+        coors_int = coors.astype(np.int32)
+        
+        # remove out of boundary points
+        mask = ((coors_int[:, :2] < feature_map_size[:2]) \
+                & (coors_int[:, :2] >= 0)).all(-1)
+        coors, coors_int = coors[mask], coors_int[mask]
+        
+        indices = coors_int[:, 1] * feature_map_size[0] + coors_int[:, 0]
+        
+        # keep only unique indices
+        unique_indices, reverse_indices = np.unique(indices, return_index=True)
+        coors, coors_int = coors[reverse_indices], coors_int[reverse_indices]
+
+        hm = np.zeros((1,
+                       feature_map_size[1],
+                       feature_map_size[0]),
+                      dtype=np.float32)
+        hm[0][(coors_int[:, 1], coors_int[:, 0])] = 1.0
+        
+        return hm
+
+    def __call__(self, num_classes, voxel_cfg, boxes, classes,
+                 visibility=None):
+        """
+        Args:
+            num_classes (int)
+            voxel_cfg (dict)
+            boxes (np.ndarray, [N, 7])
+            classes (np.ndarray, [N])
+            visibility (np.ndarray, [L, W])
+
+        Returns:
+            hm (np.ndarray, [num_classes, L, W])
+            anno_box (np.ndarray, [N_out, 10])
+            indices (np.ndarray, [N_out])
+            classes (np.ndarray, [N_out])
+
+        """
+
+        # size of heatmap and voxel
+        grid_size = voxel_cfg["shape"]
+        pc_range = voxel_cfg["range"]
+        voxel_size = voxel_cfg["size"]
+        feature_map_size = grid_size[:2] // self.out_size_factor
+        effective_voxel_size = voxel_size[:2] * self.out_size_factor
+        hm = np.zeros((num_classes,
+                       feature_map_size[1],
+                       feature_map_size[0]),
+                      dtype=np.float32)
+
+        # remove small boxes
+        mask = (boxes[:, 3:5] / effective_voxel_size > 0).all(-1)
+        boxes, classes = boxes[mask], classes[mask]
+        
+        # compute coordinates of box centers
+        coors = (boxes[:, :2] - pc_range[:2]) / effective_voxel_size
+        coors_int = coors.astype(np.int32)
+
+        # remove out of boundary objects/boxes
+        mask2 = ((coors_int[:, :2] < feature_map_size[:2]) \
+                 & (coors_int[:, :2] >= 0)).all(-1)
+        coors, coors_int = coors[mask2], coors_int[mask2]
+        boxes, classes = boxes[mask2], classes[mask2]
+        
+        # compute radius of gaussian
+        _box_dims = boxes[:, 3:5] / effective_voxel_size
+        radius = gaussian_radius(_box_dims, min_overlap=self.gaussian_overlap)
+        radius = np.maximum(self._min_radius, radius.astype(np.int32))
+
+        # draw gaussian distribution
+        for cls_id, ct, rad in zip(classes, coors_int, radius):
+            draw_gaussian(hm[cls_id], ct[:2], rad)
+        
+        # record indices of peak
+        #pos_indices = np.where(hm > 0)
+        #classes = pos_indices[0]
+        #indices = pos_indices[1] * feature_map_size[0] + pos_indices[2]
+        indices = coors_int[:, 1] * feature_map_size[0] + coors_int[:, 0]
+
+        velo, rot = boxes[:, 6:8], boxes[:, -1]
+
+        # remove unique indices
+        anno_box = np.concatenate(
+                [coors[:, :2] - coors_int[:, :2],
+                 boxes[:, 2:3],
+                 np.log(boxes[:, 3:6]),
+                 velo,
+                 np.sin(rot)[:, np.newaxis],
+                 np.cos(rot)[:, np.newaxis]],
+                axis=-1)
+
+        assert anno_box.shape[-1] == 10
+
+        return hm, anno_box, indices.astype(np.int64), classes
+
 @PIPELINES.register_module
 class AssignLabel(object):
     def __init__(self, **kwargs):
@@ -39,9 +206,9 @@ class AssignLabel(object):
         assigner_cfg = kwargs["cfg"]
         self.out_size_factor = assigner_cfg.out_size_factor
         self.tasks = assigner_cfg.target_assigner.tasks
-        self.gaussian_overlap = assigner_cfg.gaussian_overlap
+        self.cfg = assigner_cfg
         self._max_objs = assigner_cfg.max_objs
-        self._min_radius = assigner_cfg.min_radius
+        self.heatmap_generator = HeatmapGenerator(assigner_cfg)
 
     def __call__(self, res, info):
         max_objs = self._max_objs
@@ -60,35 +227,9 @@ class AssignLabel(object):
             gt_dict = res["lidar"]["box_annotations"]
 
             # reorganize the gt_dict by tasks
-            task_masks = []
-            flag = 0
-            for class_name in class_names_by_task:
-                task_masks.append(
-                    [
-                        np.where(
-                            gt_dict["gt_classes"] == class_name.index(i) + 1 + flag
-                        )
-                        for i in class_name
-                    ]
-                )
-                flag += len(class_name)
-
-            task_boxes = []
-            task_classes = []
-            task_names = []
-            flag2 = 0
-            for idx, mask in enumerate(task_masks):
-                task_box = []
-                task_class = []
-                task_name = []
-                for m in mask:
-                    task_box.append(gt_dict["gt_boxes"][m])
-                    task_class.append(gt_dict["gt_classes"][m] - flag2)
-                    task_name.append(gt_dict["gt_names"][m])
-                task_boxes.append(np.concatenate(task_box, axis=0))
-                task_classes.append(np.concatenate(task_class))
-                task_names.append(np.concatenate(task_name))
-                flag2 += len(mask)
+            offset = 0
+            task_boxes, task_classes, task_names = \
+                        organize_tasks(gt_dict, class_names_by_task)
 
             for task_box in task_boxes:
                 # limit rad to [-pi, pi]
@@ -96,112 +237,58 @@ class AssignLabel(object):
                     task_box[:, -1], offset=0.5, period=np.pi * 2
                 )
 
-            # print(gt_dict.keys())
             gt_dict["gt_classes"] = task_classes
             gt_dict["gt_names"] = task_names
             gt_dict["gt_boxes"] = task_boxes
 
             res["lidar"]["box_annotations"] = gt_dict
 
-            draw_gaussian = draw_umich_gaussian
+            points = res["lidar"]["points"]
+            seg_labels = res["lidar"]["point_annotations"]["seg_labels"]
+            point_indices = np.where(seg_labels[:, 1] > 17)[0]
+            walkable_points = points[point_indices]
 
-            hms, anno_boxs, inds, masks, cats = [], [], [], [], []
+            bghm = self.heatmap_generator.scatter_points_on_hm(
+                       walkable_points, res["lidar"]["voxels"])
+            
+            hms, anno_boxs, indices, cats = [], [], [], []
 
             for idx, task in enumerate(self.tasks):
-                hm = np.zeros((len(class_names_by_task[idx]), feature_map_size[1], feature_map_size[0]),
-                              dtype=np.float32)
+                num_classes = len(class_names_by_task[idx])
 
-                if res['type'] == 'NuScenesDataset':
-                    # [reg, hei, dim, vx, vy, rots, rotc]
-                    anno_box = np.zeros((max_objs, 10), dtype=np.float32)
-                elif res['type'] == 'WaymoDataset':
-                    anno_box = np.zeros((max_objs, 10), dtype=np.float32) 
-                else:
-                    raise NotImplementedError("Only Support nuScene for Now!")
-
-                ind = np.zeros((max_objs), dtype=np.int64)
-                mask = np.zeros((max_objs), dtype=np.uint8)
-                cat = np.zeros((max_objs), dtype=np.int64)
-
-                num_objs = min(gt_dict['gt_boxes'][idx].shape[0], max_objs)  
-
-                for k in range(num_objs):
-                    cls_id = gt_dict['gt_classes'][idx][k] - 1
-
-                    w, l, h = gt_dict['gt_boxes'][idx][k][3], gt_dict['gt_boxes'][idx][k][4], \
-                              gt_dict['gt_boxes'][idx][k][5]
-                    w, l = w / voxel_size[0] / self.out_size_factor, l / voxel_size[1] / self.out_size_factor
-                    if w > 0 and l > 0:
-                        radius = gaussian_radius((l, w), min_overlap=self.gaussian_overlap)
-                        radius = max(self._min_radius, int(radius))
-
-                        # be really careful for the coordinate system of your box annotation. 
-                        x, y, z = gt_dict['gt_boxes'][idx][k][0], gt_dict['gt_boxes'][idx][k][1], \
-                                  gt_dict['gt_boxes'][idx][k][2]
-
-                        coor_x, coor_y = (x - pc_range[0]) / voxel_size[0] / self.out_size_factor, \
-                                         (y - pc_range[1]) / voxel_size[1] / self.out_size_factor
-
-                        ct = np.array(
-                            [coor_x, coor_y], dtype=np.float32)  
-                        ct_int = ct.astype(np.int32)
-
-                        # throw out not in range objects to avoid out of array area when creating the heatmap
-                        if not (0 <= ct_int[0] < feature_map_size[0] and 0 <= ct_int[1] < feature_map_size[1]):
-                            continue 
-
-                        draw_gaussian(hm[cls_id], ct, radius)
-
-                        new_idx = k
-                        x, y = ct_int[0], ct_int[1]
-
-                        cat[new_idx] = cls_id
-                        ind[new_idx] = y * feature_map_size[0] + x
-                        mask[new_idx] = 1
-
-                        if res['type'] == 'NuScenesDataset': 
-                            vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
-                            rot = gt_dict['gt_boxes'][idx][k][8]
-                            anno_box[new_idx] = np.concatenate(
-                                (ct - (x, y), z, np.log(gt_dict['gt_boxes'][idx][k][3:6]),
-                                np.array(vx), np.array(vy), np.sin(rot), np.cos(rot)), axis=None)
-                        elif res['type'] == 'WaymoDataset':
-                            vx, vy = gt_dict['gt_boxes'][idx][k][6:8]
-                            rot = gt_dict['gt_boxes'][idx][k][-1]
-                            anno_box[new_idx] = np.concatenate(
-                            (ct - (x, y), z, np.log(gt_dict['gt_boxes'][idx][k][3:6]),
-                            np.array(vx), np.array(vy), np.sin(rot), np.cos(rot)), axis=None)
-                        else:
-                            raise NotImplementedError("Only Support Waymo and nuScene for Now")
+                hm, anno_box, index, cat = self.heatmap_generator(
+                                               num_classes,
+                                               res["lidar"]["voxels"],
+                                               gt_dict["gt_boxes"][idx],
+                                               gt_dict["gt_classes"][idx]-1,
+                                           )
 
                 hms.append(hm)
                 anno_boxs.append(anno_box)
-                masks.append(mask)
-                inds.append(ind)
+                indices.append(index)
                 cats.append(cat)
 
             # used for two stage code 
             boxes = flatten(gt_dict['gt_boxes'])
-            classes = merge_multi_group_label(gt_dict['gt_classes'], num_classes_by_task)
+            classes = merge_multi_group_label(gt_dict['gt_classes'],
+                                              num_classes_by_task)
+            
+            boxes_and_cls = np.concatenate(
+                                (boxes, 
+                                 classes.reshape(-1, 1).astype(np.float32)),
+                                axis=1)
 
-            if res["type"] == "NuScenesDataset":
-                gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
-            elif res['type'] == "WaymoDataset":
-                gt_boxes_and_cls = np.zeros((max_objs, 10), dtype=np.float32)
-            else:
-                raise NotImplementedError()
-
-            boxes_and_cls = np.concatenate((boxes, 
-                classes.reshape(-1, 1).astype(np.float32)), axis=1)
-            num_obj = len(boxes_and_cls)
-            assert num_obj <= max_objs
             # x, y, z, w, l, h, rotation_y, velocity_x, velocity_y, class_name
             boxes_and_cls = boxes_and_cls[:, [0, 1, 2, 3, 4, 5, 8, 6, 7, 9]]
-            gt_boxes_and_cls[:num_obj] = boxes_and_cls
+            
+            data = dict(
+                gt_boxes_and_cls=boxes_and_cls,
+                anno_box=anno_boxs,
+                ind=indices,
+                cat=cats,
+            )
 
-            example.update({'gt_boxes_and_cls': gt_boxes_and_cls})
-
-            example.update({'hm': hms, 'anno_box': anno_boxs, 'ind': inds, 'mask': masks, 'cat': cats})
+            example.update({'batch_data': data, 'hm': hms, 'seg_hm': bghm})
         else:
             pass
 

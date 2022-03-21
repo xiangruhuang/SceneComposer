@@ -223,7 +223,8 @@ def collate_kitti(batch_list, samples_per_gpu=1):
                         _res.append(torch.cat(task_vals, dim=0))
                     ret[key] = _res
                     ret[f'{key}_batch'] = _batch
-                    
+        elif key in ['seg_hm']:
+            ret[key] = torch.tensor(np.stack(elems, axis=0))
         else:
             ret[key] = np.stack(elems, axis=0)
 

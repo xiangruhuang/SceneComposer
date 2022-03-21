@@ -1,4 +1,3 @@
-from .center_head import CenterHead
-from .center_head2 import CenterHead2
+from .co_train_head import CoTrainHead
 
-__all__ = ["CenterHead", "CenterHead2"]
+__all__ = ["CoTrainHead"]

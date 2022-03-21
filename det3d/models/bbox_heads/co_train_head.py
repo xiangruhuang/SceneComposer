@@ -11,7 +11,7 @@ from det3d.core import box_torch_ops
 import torch
 from det3d.torchie.cnn import kaiming_init
 from torch import double, nn
-from det3d.models.losses.centernet_loss import * 
+from det3d.models.losses.discrete_loss import * 
 from det3d.models.utils import Sequential
 from ..registry import HEADS
 import copy 
@@ -165,39 +165,43 @@ class DCNSepHead(nn.Module):
 
 
 @HEADS.register_module
-class CenterHead2(nn.Module):
+class CoTrainHead(nn.Module):
     def __init__(
         self,
         in_channels=[128,],
         tasks=[],
         dataset='nuscenes',
-        consrv_weight=0,
-        weight=0.25,
-        code_weights=[],
-        common_heads=dict(),
+        attr_weight=0.25,
+        attr_weights=[],
+        heads=dict(),
+        seg_cfg=None,
         logger=None,
         init_bias=-2.19,
         share_conv_channel=64,
         num_hm_conv=2,
         dcn_head=False,
     ):
-        super(CenterHead2, self).__init__()
+        super(CoTrainHead, self).__init__()
 
         num_classes = [len(t["class_names"]) for t in tasks]
         self.class_names = [t["class_names"] for t in tasks]
-        self.code_weights = code_weights 
-        self.weight = weight  # weight between hm loss and loc loss
-        self.consrv_weight = consrv_weight
+        self.attr_weights = attr_weights
+        self.attr_weight = attr_weight  # weight between hm loss and attr loss
         self.dataset = dataset
 
         self.in_channels = in_channels
         self.num_classes = num_classes
 
-        self.crit = FastFocalLoss2()
-        self.crit_reg = RegLoss2()
-        self.consrv_loss = ConservativeHM()
+        self.crit = FastFocalLoss()
+        self.crit_reg = RegLoss()
+        
+        if seg_cfg is not None:
+            self.crit_seg = nn.BCELoss()
+            self.seg_weight = seg_cfg.get("weight", 1.0)
+            seg_heads = seg_cfg.get("heads", {})
+            heads.update(seg_heads)
 
-        self.box_n_dim = 9 if 'vel' in common_heads else 7  
+        self.box_n_dim = 9 if 'vel' in heads else 7  
         self.use_direction_classifier = False 
 
         if not logger:
@@ -223,7 +227,7 @@ class CenterHead2(nn.Module):
             print("Use Deformable Convolution in the CenterHead!")
 
         for num_cls in num_classes:
-            heads = copy.deepcopy(common_heads)
+            heads = copy.deepcopy(heads)
             if not dcn_head:
                 heads.update(dict(hm=(num_cls, num_hm_conv)))
                 self.tasks.append(
@@ -258,9 +262,11 @@ class CenterHead2(nn.Module):
 
             hm_loss = self.crit(preds_dict['hm'], example['hm'][task_id],
                                 example['ind'][task_id], example['ind_batch'][task_id],
-                                example['neg_ind'][task_id], example['neg_ind_batch'][task_id],
                                 example['cat'][task_id]
-                                )
+                               )
+
+            preds_dict['seg'] = self._sigmoid(preds_dict['seg'])
+            seg_loss = self.crit_seg(preds_dict['seg'], example['seg_hm'])
 
             target_box = example['anno_box'][task_id]
             # reconstruct the anno_box from multiple reg heads
@@ -289,20 +295,18 @@ class CenterHead2(nn.Module):
                                      example['ind'][task_id],
                                      example['ind_batch'][task_id])
 
-            loc_loss = (box_loss*box_loss.new_tensor(self.code_weights)).sum()
+            attr_loss = (box_loss*box_loss.new_tensor(self.attr_weights)).sum()
 
-            consrv_loss = self.consrv_loss(preds_dict['hm'], example['hm'][task_id])
-
-            loss = hm_loss + 0 * self.weight*loc_loss + consrv_loss * self.consrv_weight
+            loss = hm_loss + self.attr_weight*attr_loss + self.seg_weight*seg_loss
 
             ret.update(dict(
                             loss = loss,
                             hm_loss = hm_loss.detach().cpu(),
-                            loc_loss = loc_loss,
-                            consrv_loss = consrv_loss,
-                            loc_loss_elem = box_loss.detach().cpu(),
+                            seg_loss = seg_loss.detach().cpu(),
+                            attr_loss = attr_loss.detach().cpu(),
+                            attr_loss_elem = box_loss.detach().cpu(),
                             num_positive = torch.tensor(example['ind'][task_id].shape[0]))
-                      ) 
+                      )
 
             rets.append(ret)
         

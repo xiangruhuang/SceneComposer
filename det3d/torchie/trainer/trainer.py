@@ -49,6 +49,7 @@ def example_to_device(example, device, non_blocking=False) -> dict:
             "cyv_coordinates",
             "cyv_num_points",
             "gt_boxes_and_cls",
+            "seg_hm",
         ]:
             example_torch[k] = v.to(device, non_blocking=non_blocking)
         elif k in ["calib", "objects"]:
@@ -67,7 +68,7 @@ def parse_second_losses(losses):
     log_vars = OrderedDict()
     loss = sum(losses["loss"])
     for loss_name, loss_value in losses.items():
-        if loss_name == "loc_loss_elem":
+        if loss_value[0].numel() > 1:
             log_vars[loss_name] = [[i.item() for i in j] for j in loss_value]
         else:
             log_vars[loss_name] = [i.item() for i in loss_value]
