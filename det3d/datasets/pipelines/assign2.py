@@ -198,7 +198,7 @@ class AssignLabel2(object):
 
         if res["mode"] == "train":
 
-            gt_dict = res["lidar"]["annotations"]
+            gt_dict = res["lidar"]["box_annotations"]
 
             # reorganize the gt_dict by tasks
             task_boxes, task_classes, task_names = \
@@ -214,7 +214,7 @@ class AssignLabel2(object):
             gt_dict["gt_names"] = task_names
             gt_dict["gt_boxes"] = task_boxes
 
-            res["lidar"]["annotations"] = gt_dict
+            res["lidar"]["box_annotations"] = gt_dict
             
             # compute heatmap and box annotations by task
             hms, anno_boxs, indices, cats, neg_indices = [], [], [], [], []

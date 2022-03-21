@@ -44,7 +44,7 @@ class Preprocess(object):
 
         if self.mode == "train":
             # load annotations and remove unused classes
-            anno_dict = res["lidar"]["annotations"]
+            anno_dict = res["lidar"]["box_annotations"]
 
             gt_dict = {
                 "gt_boxes": anno_dict["boxes"],
@@ -72,7 +72,7 @@ class Preprocess(object):
             if "seg_labels" in anno_dict:
                 gt_dict["seg_labels"] = anno_dict["seg_labels"]
 
-            res["lidar"]["annotations"] = gt_dict
+            res["lidar"]["box_annotations"] = gt_dict
 
         if self.shuffle_points:
             np.random.shuffle(points)
@@ -105,20 +105,12 @@ class Voxelization(object):
         grid_size = self.voxel_generator.grid_size
 
         if res["mode"] == "train":
-            gt_dict = res["lidar"]["annotations"]
+            gt_dict = res["lidar"]["box_annotations"]
             bv_range = pc_range[[0, 1, 3, 4]]
             mask = prep.filter_gt_box_outside_range(gt_dict["gt_boxes"], bv_range)
-            try:
-                _dict_select(gt_dict, mask)
-            except Exception as e:
-                print('------')
-                print(mask.shape)
-                for key in gt_dict.keys():
-                    print(key, gt_dict[key].shape)
-                print(e)
+            _dict_select(gt_dict, mask)
 
-
-            res["lidar"]["annotations"] = gt_dict
+            res["lidar"]["box_annotations"] = gt_dict
             max_voxels = self.max_voxel_num[0]
         else:
             max_voxels = self.max_voxel_num[1]

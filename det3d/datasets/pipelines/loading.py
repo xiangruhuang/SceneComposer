@@ -192,7 +192,7 @@ class LoadPointCloudAnnotations(object):
 
         if res["type"] == 'WaymoDataset' and "gt_boxes" in info:
             unique_ids = info.get("unique_ids", None)
-            res["lidar"]["annotations"] = {
+            res["lidar"]["box_annotations"] = {
                 "boxes": info["gt_boxes"].astype(np.float32),
                 "names": info["gt_names"],
                 "unique_ids": unique_ids,
@@ -201,11 +201,9 @@ class LoadPointCloudAnnotations(object):
                 seg_path = info['seg_path']
                 if seg_path is not None:
                     seg_labels = get_obj(seg_path)["point_labels"]
-                else:
-                    seg_labels = None
-                res["lidar"]["annotations"].update(
-                    dict(seg_labels=seg_labels)
-                )
+                    res["lidar"]["point_annotations"] = dict(
+                        seg_labels=seg_labels
+                    )
         else:
             pass 
 

@@ -174,13 +174,26 @@ class TestBackbone(nn.Module):
         )
 
     def forward(self, voxel_features, coors, batch_size, input_shape):
+        """
+        Args:
+            voxel_features ([num_voxels, 5])
+            coors ([num_voxels, 4]): channels=(batch, z, y, x)
+            batch_size (int): number of minibatch
+            input_shape: np.ndarray([3]): range of (x, y, z) dims
 
-        # input: # [41, 1600, 1408]
+        Returns:
+
+        """
+
+        import ipdb; ipdb.set_trace()
+
+        # input (z, y, x): # [41, 1600, 1408]
         sparse_shape = np.array(input_shape[::-1]) + [1, 0, 0]
 
         coors = coors.int()
         ret = spconv.SparseConvTensor(voxel_features, coors, sparse_shape, batch_size)
 
+        # indice_dict: outids, indice_pairs, indice_pair_num
         x = self.conv_input(ret)
 
         x_conv1 = self.conv1(x)

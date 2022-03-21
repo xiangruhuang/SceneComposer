@@ -143,7 +143,7 @@ class SeparateForeground(object):
         assert self.mode == "train"
         
         points = res["lidar"]["points"]
-        gt_dict = res["lidar"]["annotations"]
+        gt_dict = res["lidar"]["box_annotations"]
         gt_boxes = gt_dict["gt_boxes"]
 
         if gt_boxes.shape[0] > 0:

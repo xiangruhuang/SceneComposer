@@ -49,7 +49,7 @@ class ReplaceAug(object):
     def __call__(self, res, info):
         
         points = res["lidar"]["points"]
-        gt_dict = res["lidar"]["annotations"]
+        gt_dict = res["lidar"]["box_annotations"]
 
         gt_boxes = gt_dict['gt_boxes']
         gt_names = gt_dict['gt_names']
@@ -131,7 +131,7 @@ class ReplaceAug(object):
             gt_dict["gt_boxes"] = gt_boxes
 
         res["lidar"]["points"] = points
-        res["lidar"]["annotations"] = gt_dict
+        res["lidar"]["box_annotations"] = gt_dict
 
         return res, info
 
@@ -152,7 +152,7 @@ class GTAug(object):
         assert self.mode == "train", "For training only."
 
         points = res["lidar"]["points"]
-        gt_dict = res["lidar"]["annotations"]
+        gt_dict = res["lidar"]["box_annotations"]
             
         if self.db_sampler:
             sampled_dict = self.db_sampler.sample_all(
@@ -187,7 +187,7 @@ class GTAug(object):
         )
         gt_dict["gt_classes"] = gt_classes
 
-        res["lidar"]["annotations"] = gt_dict
+        res["lidar"]["box_annotations"] = gt_dict
         res["lidar"]["points"] = points
 
         return res, info
@@ -207,7 +207,7 @@ class AffineAug(object):
         assert self.mode == "train", "For training only."
 
         points = res["lidar"]["points"]
-        gt_dict = res["lidar"]["annotations"]
+        gt_dict = res["lidar"]["box_annotations"]
             
         gt_dict["gt_boxes"], points = prep.random_flip_both(gt_dict["gt_boxes"], points)
 
@@ -221,7 +221,7 @@ class AffineAug(object):
             gt_dict["gt_boxes"], points, noise_translate_std=self.global_translate_std
         )
 
-        res["lidar"]["annotations"] = gt_dict
+        res["lidar"]["box_annotations"] = gt_dict
         res["lidar"]["points"] = points
 
         return res, info
@@ -307,9 +307,9 @@ class SceneAug(object):
         info['gt_boxes'] = boxes
         info['unique_ids'] = uids
 
-        res["lidar"]["annotations"]["gt_boxes"] = boxes 
-        res["lidar"]["annotations"]["gt_names"] = names
-        res["lidar"]["annotations"]["gt_classes"] = classes
+        res["lidar"]["box_annotations"]["gt_boxes"] = boxes 
+        res["lidar"]["box_annotations"]["gt_names"] = names
+        res["lidar"]["box_annotations"]["gt_classes"] = classes
 
         return res, info
 
@@ -502,14 +502,16 @@ class SemanticAug(object):
                                   boxes, point_clouds,
                                   non_walkable_points)
 
-        classes = np.array([self.class_names.index(key) + 1 for i in range(boxes.shape[0])], dtype=np.int32)
+        classes = np.array([self.class_names.index(key) + 1 \
+                            for i in range(boxes.shape[0])], dtype=np.int32)
 
         return boxes, point_clouds, classes
 
     def __call__(self, res, info):
 
         points = res["lidar"]["points"]
-        seg_labels = res["lidar"]["annotations"].pop("seg_labels")
+        assert res["lidar"]["point_annotations"], "no point annotations loaded"
+        seg_labels = res["lidar"]["point_annotations"]["seg_labels"]
         
         # find marked points
         points = points[:seg_labels.shape[0]]
@@ -557,7 +559,7 @@ class SemanticAug(object):
                                          res["lidar"]["points"],
                                          sampled_points], axis=0)
 
-            gt_dict = res["lidar"]["annotations"]
+            gt_dict = res["lidar"]["box_annotations"]
             gt_boxes = gt_dict["gt_boxes"]
             gt_names = gt_dict["gt_names"]
             gt_classes = gt_dict["gt_classes"]
@@ -575,6 +577,6 @@ class SemanticAug(object):
                 gt_classes=gt_classes,
             )
 
-            res["lidar"]["annotations"] = gt_dict
+            res["lidar"]["box_annotations"] = gt_dict
 
         return res, info
